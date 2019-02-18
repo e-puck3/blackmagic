@@ -20,7 +20,7 @@
 #ifndef __GPIO_H
 #define __GPIO_H
 
-#include "hal.h"
+//#include "hal.h"
 
 #define gpio_set palSetPad
 
@@ -30,9 +30,9 @@
 
 #define gpio_set_val(port, pin, val) do {	\
 	if(val)					\
-		gpio_set((port), (pin));	\
+		gpio_set(port, pin);	\
 	else					\
-		gpio_clear((port), (pin));	\
+		gpio_clear(port, pin);	\
 } while(0)
 
 #endif

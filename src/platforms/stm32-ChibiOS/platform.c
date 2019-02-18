@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "main.h"
+#include "platform.h"
 #include "gdb_packet.h"
 
 //////////////////////////////////////////PUBLIC FUNCTIONS/////////////////////////////////////////

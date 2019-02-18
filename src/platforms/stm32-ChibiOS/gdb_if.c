@@ -46,11 +46,6 @@ void gdb_if_putchar(unsigned char c, int flush)
 			chnWrite((BaseChannel *) &USB_GDB, buffer_in, count_in);
 		}
 
-		//send to the ESP's UART if GPIO0 is low and this UART is not already in use
-		if( communicationIsBluetoothConnected() && (communicationGetActiveMode() != UART_ESP_PASSTHROUGH) ) {
-			chnWrite((BaseChannel *) &UART_ESP, buffer_in, count_in);
-		}
-
 		count_in = 0;
 		return;
 	}
@@ -58,15 +53,12 @@ void gdb_if_putchar(unsigned char c, int flush)
 
 static void gdb_if_update_buf(uint32_t timeout)
 {
-	while (!isUSBConfigured() && !communicationIsBluetoothConnected()){
+	while (!isUSBConfigured()){
 		chThdSleepMilliseconds(10);
 	}
 
 	count_out = chnReadTimeout((BaseChannel *) &USB_GDB, buffer_out, USB_DATA_SIZE, timeout);
 
-	if(count_out == 0 && communicationGetActiveMode() != UART_ESP_PASSTHROUGH){
-		count_out = chnReadTimeout((BaseChannel *) &UART_ESP, buffer_out, USB_DATA_SIZE, timeout);
-	}
 	out_ptr = 0;
 }
 
@@ -75,7 +67,7 @@ unsigned char gdb_if_getchar(void)
 
 	while (!(out_ptr < count_out)) {
 		/* Detach if port closed */
-		if (!getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR) && !communicationIsBluetoothConnected())
+		if (!getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR))
 			return 0x04;
 
 		gdb_if_update_buf(TIME_MS2I(1));
@@ -91,7 +83,7 @@ unsigned char gdb_if_getchar_to(int timeout)
 
 	if (!(out_ptr < count_out)) do {
 		/* Detach if port closed */
-		if (!getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR) && !communicationIsBluetoothConnected())
+		if (!getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR))
 			return 0x04;
 
 		gdb_if_update_buf(TIME_MS2I(1));

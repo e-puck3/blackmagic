@@ -22,33 +22,34 @@
 #include "gpio.h"
 #include "timing.h"
 #include "timing_stm32.h"
+#include "debug.h"
 
 #define USB_NAME "Blackmagic probe"
 
-#define NOT_USED	0
-#define JTAG_PORT 	
-#define TDI_PORT	NOT_USED
-#define TMS_PORT	NOT_USED
-#define TCK_PORT	NOT_USED
-#define TDO_PORT	NOT_USED
-#define TDI_PIN		NOT_USED
+#define NOT_USED	0	//Only for pin. The ports should always be defined, even if it's not used
+#define JTAG_PORT 	GPIOA
+#define TDI_PORT	JTAG_PORT
+#define TMS_PORT	JTAG_PORT
+#define TCK_PORT	JTAG_PORT
+#define TDO_PORT	JTAG_PORT
+#define TDI_PIN		JTAG_PORT
 #define TMS_PIN		NOT_USED
 #define TCK_PIN		NOT_USED
 #define TDO_PIN		NOT_USED
 
-#define SWDIO_PORT 	NOT_USED
-#define SWCLK_PORT 	NOT_USED
-#define SWDIO_PIN	NOT_USED
-#define SWCLK_PIN	NOT_USED
+#define SWDIO_PORT 	JTAG_PORT
+#define SWCLK_PORT 	JTAG_PORT
+#define SWDIO_PIN	TMS_PIN
+#define SWCLK_PIN	TCK_PIN
 
-#define TRST_PORT	NOT_USED
+#define TRST_PORT	JTAG_PORT
 #define TRST_PIN	NOT_USED
-#define SRST_PORT	NOT_USED
+#define SRST_PORT	GPIOB
 #define SRST_PIN	NOT_USED
 
-#define LED_PORT_ERROR		NOT_USED //RED_LED
-#define LED_PORT_UART		NOT_USED //BLUE_LED
-#define LED_PORT			NOT_USED //GREEN_LED
+#define LED_PORT_ERROR		GPIOA //RED_LED
+#define LED_PORT_UART		GPIOA //BLUE_LED
+#define LED_PORT			GPIOA //GREEN_LED
 
 
 #define LED_ERROR		NOT_USED	
@@ -61,8 +62,6 @@
 #define SWDIO_MODE_FLOAT() {palSetPadMode(SWDIO_PORT, SWDIO_PIN, PAL_MODE_INPUT);}
 
 #define SWDIO_MODE_DRIVE() {palSetPadMode(SWDIO_PORT, SWDIO_PIN, PAL_MODE_OUTPUT_PUSHPULL);}
-
-#define DEBUG(...)
 
 #define SET_RUN_STATE(state)	{gdbSetFlag(state ? RUNNING_FLAG : IDLE_FLAG);};
 #define SET_PROGRAMMING_STATE()	{gdbSetFlag(PROGRAMMING_FLAG);};

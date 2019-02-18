@@ -45,7 +45,7 @@ void jtagtap_reset(void)
 {
 #ifdef TRST_PORT
 	if (platform_hwversion() == 0) {
-		volatile int i;
+		//volatile int i;
 		gpio_clear(TRST_PORT, TRST_PIN);
 		chThdSleepMilliseconds(1);
 		gpio_set(TRST_PORT, TRST_PIN);

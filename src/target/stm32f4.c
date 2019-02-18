@@ -32,7 +32,21 @@
  *    manual
  */
 
-#include "general.h"
+//#include "general.h"
+
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <stddef.h>
+#include <inttypes.h>
+#include <sys/types.h>
+
+#if defined(USE_CHIBIOS)
+#include <debug.h>
+#endif /* USE_CHIBIOS */
+
 #include "target.h"
 #include "target_internal.h"
 #include "cortexm.h"
