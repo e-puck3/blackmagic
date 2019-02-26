@@ -24,7 +24,10 @@
  * According to: TivaTM TM4C123GH6PM Microcontroller Datasheet
  */
 
+#define FROM_TARGET
 #include "general.h"
+#undef FROM_TARGET
+
 #include "target.h"
 #include "target_internal.h"
 #include "cortexm.h"

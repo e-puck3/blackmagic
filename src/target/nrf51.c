@@ -21,7 +21,10 @@
  * the device, providing the XML memory map and Flash memory programming.
  */
 
+#define FROM_TARGET
 #include "general.h"
+#undef FROM_TARGET
+
 #include "target.h"
 #include "target_internal.h"
 #include "cortexm.h"

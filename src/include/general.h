@@ -30,8 +30,11 @@
 #include <stddef.h>
 #include <inttypes.h>
 #include <sys/types.h>
+#include "debug.h"
 
+#ifndef FROM_TARGET
 #include "platform.h"
+#endif /* FROM_TARGET */
 #include "platform_support.h"
 
 #ifndef DEBUG

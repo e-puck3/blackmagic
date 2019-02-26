@@ -37,7 +37,10 @@
  * http://www.silabs.com/Support%20Documents/TechnicalDocs/an0062.pdf
  */
 
+#define FROM_TARGET
 #include "general.h"
+#undef FROM_TARGET
+
 #include "target.h"
 #include "target_internal.h"
 #include "cortexm.h"

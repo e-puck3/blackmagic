@@ -1,10 +1,6 @@
 
 # Imported source files and paths for blackmagic
 
-# ifndef BLACKMAGIC
-# 	$(error BLACKMAGIC path is not defined)
-# else
-
 NO_JTAG = 1
 
 ALLDEFS +=	-DUSE_CHIBIOS

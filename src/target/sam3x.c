@@ -24,7 +24,10 @@
  * Supported devices: SAM3N, SAM3S, SAM3U, SAM3X, and SAM4S
  */
 
+#define FROM_TARGET
 #include "general.h"
+#undef FROM_TARGET
+
 #include "target.h"
 #include "target_internal.h"
 
