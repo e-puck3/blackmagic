@@ -196,6 +196,10 @@ static bool cmd_jtag_scan(target *t, int argc, char **argv)
 
 bool cmd_swdp_scan(void)
 {
+#ifdef POWER_ON_WHEN_SWDP_SCAN
+	//power on the target if we try to program it
+	turn_on_target_on_swdp_scan();
+#endif /* POWER_ON_WHEN_SWDP_SCAN */
 	gdb_outf("Target voltage: %s\n", platform_target_voltage());
 
 	if(connect_assert_srst)

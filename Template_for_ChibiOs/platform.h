@@ -26,10 +26,16 @@
 
 #define USB_NAME "Blackmagic probe"
 
-/* uncomment to use a second interface to communicate with GDB
+/* Uncomment to use a second interface to communicate with GDB
 the behavior is to try to read or write to the second interfsce provided if the USB
 isn't connected. It means the USB has always the priority*/
-#define USE_SECOND_GDB_INTERFACE
+
+//#define USE_SECOND_GDB_INTERFACE
+
+/* 	Uncomment if you want to turn on the target when a swdp_scan is done.
+	It is useless if you don't have a physical way to do it */
+
+//#define POWER_ON_WHEN_SWDP_SCAN
 
 
 #ifdef USE_SECOND_GDB_INTERFACE
@@ -54,6 +60,17 @@ bool is_second_gdb_interface_active(void);
  */		
 bool is_second_gdb_interface_connected(void);
 #endif /* USE_SECOND_GDB_INTERFACE */
+
+#ifdef POWER_ON_WHEN_SWDP_SCAN
+
+/* 	the function below need to be filled to turn on the target.
+	you ca safely add a chThdSleep() inside in order to be sure the target has booted */
+
+/**
+ * @brief Function to turn on the target
+ */
+void turn_on_target_on_swdp_scan(void);
+#endif /* POWER_ON_WHEN_SWDP_SCAN */
 
 
 #define NOT_USED	0	//Only for pin. The ports should always be defined, even if it's not used

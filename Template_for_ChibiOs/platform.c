@@ -45,3 +45,7 @@ bool is_second_gdb_interface_connected(void){
 	//to be replaced by your own implementation or to be let like this if not used
 	return false;
 }
+
+void turn_on_target_on_swdp_scan(void){
+	//Add your own implementation or let it like this if not used
+}
