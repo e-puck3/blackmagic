@@ -26,6 +26,36 @@
 
 #define USB_NAME "Blackmagic probe"
 
+/* uncomment to use a second interface to communicate with GDB
+the behavior is to try to read or write to the second interfsce provided if the USB
+isn't connected. It means the USB has always the priority*/
+#define USE_SECOND_GDB_INTERFACE
+
+
+#ifdef USE_SECOND_GDB_INTERFACE
+//Serial or USB Serial object used (for example SD2 for UART2) 
+#define GDB_2ND_INTERFACE
+/* the two functions below are to be filled in platform.c */	
+
+/**
+ * @brief 	Tell if the second interface usable for GDB is active
+ * @details In the current implementation, it is possible to have a second interface such as UART
+ * 			for example to communicate with GDB when the USB isn't connected. 
+ * 			This function is used to know if we want to use the second intergace or not.
+ * @return true if connected, false otherwise
+ */		
+bool is_second_gdb_interface_active(void);
+
+/**
+ * @brief 	Tell if the second interface usable for GDB is connected
+ * @details In the current implementation, it is possible to have a second interface such as UART
+ * 			for example to communicate with GDB when the USB isn't connected.
+ * @return true if connected, false otherwise
+ */		
+bool is_second_gdb_interface_connected(void);
+#endif /* USE_SECOND_GDB_INTERFACE */
+
+
 #define NOT_USED	0	//Only for pin. The ports should always be defined, even if it's not used
 #define JTAG_PORT 	GPIOA
 #define TDI_PORT	JTAG_PORT

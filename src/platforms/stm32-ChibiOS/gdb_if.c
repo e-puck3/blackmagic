@@ -45,7 +45,12 @@ void gdb_if_putchar(unsigned char c, int flush)
 		if(( isUSBConfigured() && getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR)) ) {
 			chnWrite((BaseChannel *) &USB_GDB, buffer_in, count_in);
 		}
-
+#ifdef USE_SECOND_GDB_INTERFACE
+		//send to the second GDB interface if it is active and connected
+		if( is_second_gdb_interface_active() && is_second_gdb_interface_connected() ) {
+			chnWrite((BaseChannel *) &GDB_2ND_INTERFACE, buffer_in, count_in);
+		}
+#endif /* USE_SECOND_GDB_INTERFACE */
 		count_in = 0;
 		return;
 	}
@@ -53,12 +58,21 @@ void gdb_if_putchar(unsigned char c, int flush)
 
 static void gdb_if_update_buf(uint32_t timeout)
 {
-	while (!isUSBConfigured()){
+#ifdef USE_SECOND_GDB_INTERFACE
+	while ( !isUSBConfigured() && !is_second_gdb_interface_connected() ){
+#else
+	while ( !isUSBConfigured() ){
+#endif /* USE_SECOND_GDB_INTERFACE */
 		chThdSleepMilliseconds(10);
 	}
 
 	count_out = chnReadTimeout((BaseChannel *) &USB_GDB, buffer_out, USB_DATA_SIZE, timeout);
 
+#ifdef USE_SECOND_GDB_INTERFACE
+	if(count_out == 0 && is_second_gdb_interface_active() ){
+		count_out = chnReadTimeout((BaseChannel *) &GDB_2ND_INTERFACE, buffer_out, USB_DATA_SIZE, timeout);
+	}
+#endif /* USE_SECOND_GDB_INTERFACE */
 	out_ptr = 0;
 }
 
@@ -67,7 +81,11 @@ unsigned char gdb_if_getchar(void)
 
 	while (!(out_ptr < count_out)) {
 		/* Detach if port closed */
-		if (!getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR))
+#ifdef USE_SECOND_GDB_INTERFACE
+		if ( !getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR) && !is_second_gdb_interface_connected() )
+#else
+		if ( !getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR) )
+#endif /* USE_SECOND_GDB_INTERFACE */
 			return 0x04;
 
 		gdb_if_update_buf(TIME_MS2I(1));
@@ -83,7 +101,11 @@ unsigned char gdb_if_getchar_to(int timeout)
 
 	if (!(out_ptr < count_out)) do {
 		/* Detach if port closed */
-		if (!getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR))
+#ifdef USE_SECOND_GDB_INTERFACE
+		if ( !getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR) && !is_second_gdb_interface_connected() )
+#else
+		if ( !getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR) )
+#endif /* USE_SECOND_GDB_INTERFACE */
 			return 0x04;
 
 		gdb_if_update_buf(TIME_MS2I(1));

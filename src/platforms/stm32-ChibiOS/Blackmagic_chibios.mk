@@ -36,7 +36,6 @@ ALLCSRC += 	$(BLACKMAGIC)/src/target/adiv5.c    \
 			$(BLACKMAGIC)/src/target/stm32f4.c \
 			$(BLACKMAGIC)/src/platforms/common/timing.c  \
 			$(BLACKMAGIC)/src/platforms/common/swdptap.c \
-			$(BLACKMAGIC)/src/platforms/common/platform.c \
 			$(BLACKMAGIC)/src/platforms/stm32-ChibiOS/gdb.c \
 			$(BLACKMAGIC)/src/platforms/stm32-ChibiOS/timing_stm32.c \
 			$(BLACKMAGIC)/src/platforms/stm32-ChibiOS/gdb_if.c  \

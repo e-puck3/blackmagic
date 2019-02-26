@@ -12,7 +12,7 @@
 #include "platform.h"
 #include "gdb_packet.h"
 
-//////////////////////////////////////////PUBLIC FUNCTIONS/////////////////////////////////////////
+//////////////////////////////////////////PLATFORM FUNCTIONS/////////////////////////////////////////
 
 void platform_srst_set_val(bool assert)
 {
@@ -32,4 +32,16 @@ bool platform_srst_get_val(void)
 const char *platform_target_voltage(void)
 {
 	return "ABSENT!";
+}
+
+bool is_second_gdb_interface_active(void){
+
+	//to be replaced by your own implementation or to be let like this if not used
+	return false;
+}
+
+bool is_second_gdb_interface_connected(void){
+
+	//to be replaced by your own implementation or to be let like this if not used
+	return false;
 }
