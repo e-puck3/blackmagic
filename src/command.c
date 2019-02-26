@@ -64,6 +64,11 @@ static bool cmd_traceswo(target *t, int argc, const char **argv);
 static bool cmd_debug_bmp(target *t, int argc, const char **argv);
 #endif
 
+#ifdef PLATFORM_HAS_CUSTOM_COMMANDS
+#define PLATFORM_COMMANDS_DEFINE
+#include <platform_commands.h>
+#endif
+
 const struct command_s cmd_list[] = {
 	{"version", (cmd_handler)cmd_version, "Display firmware version info"},
 	{"help", (cmd_handler)cmd_help, "Display help for monitor commands"},
@@ -84,6 +89,10 @@ const struct command_s cmd_list[] = {
 #endif
 #ifdef PLATFORM_HAS_DEBUG
 	{"debug_bmp", (cmd_handler)cmd_debug_bmp, "Output BMP \"debug\" strings to the second vcom: (enable|disable)"},
+#endif
+#ifdef PLATFORM_HAS_CUSTOM_COMMANDS
+#define PLATFORM_COMMANDS_LIST
+#include <platform_commands.h>
 #endif
 	{NULL, NULL, NULL}
 };
@@ -329,4 +338,9 @@ static bool cmd_debug_bmp(target *t, int argc, const char **argv)
 		 debug_bmp ? "enabled" : "disabled");
 	return true;
 }
+#endif
+
+#ifdef PLATFORM_HAS_CUSTOM_COMMANDS
+#define PLATFORM_COMMANDS_CODE
+#include <platform_commands.h>
 #endif

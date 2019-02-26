@@ -37,6 +37,11 @@ isn't connected. It means the USB has always the priority*/
 
 //#define POWER_ON_WHEN_SWDP_SCAN
 
+/*  Uncomment if you want to add custom commands to GDB. The commands are defined in the
+	platform_commands.h */
+
+//#define PLATFORM_HAS_CUSTOM_COMMANDS
+
 
 #ifdef USE_SECOND_GDB_INTERFACE
 //Serial or USB Serial object used (for example SD2 for UART2) 
