@@ -2,8 +2,9 @@
  * @file	platform.h
  * @brief  	Used to make the link between the blackmagic files and the ChibiOS project.
  * 
- * @written by  	Eliot Ferragni
- * @creation date	15.02.2019
+ * @written by  		Eliot Ferragni
+ * @creation date		15.02.2019
+ * @last modification	27.02.2019
  */
 
 #ifndef __PLATFORM_H
@@ -24,8 +25,6 @@
 #include "timing_stm32.h"
 #include "debug.h"
 
-#define USB_NAME "Blackmagic probe"
-
 /* Uncomment to use a second interface to communicate with GDB
 the behavior is to try to read or write to the second interfsce provided if the USB
 isn't connected. It means the USB has always the priority*/
@@ -44,8 +43,9 @@ isn't connected. It means the USB has always the priority*/
 
 
 #ifdef USE_SECOND_GDB_INTERFACE
-//Serial or USB Serial object used (for example SD2 for UART2) 
-#define GDB_2ND_INTERFACE
+//Replace with the Serial or USB Serial object you want to use (for example SD2 for UART2) 
+#define GDB_2ND_INTERFACE	TO_BE_FILLED
+
 /* the two functions below are to be filled in platform.c */	
 
 /**
@@ -55,7 +55,7 @@ isn't connected. It means the USB has always the priority*/
  * 			This function is used to know if we want to use the second intergace or not.
  * @return true if connected, false otherwise
  */		
-bool is_second_gdb_interface_active(void);
+bool platform_is_second_gdb_interface_active(void);
 
 /**
  * @brief 	Tell if the second interface usable for GDB is connected
@@ -63,7 +63,7 @@ bool is_second_gdb_interface_active(void);
  * 			for example to communicate with GDB when the USB isn't connected.
  * @return true if connected, false otherwise
  */		
-bool is_second_gdb_interface_connected(void);
+bool platform_is_second_gdb_interface_connected(void);
 #endif /* USE_SECOND_GDB_INTERFACE */
 
 #ifdef POWER_ON_WHEN_SWDP_SCAN
@@ -74,20 +74,20 @@ bool is_second_gdb_interface_connected(void);
 /**
  * @brief Function to turn on the target
  */
-void turn_on_target_on_swdp_scan(void);
+void platform_turn_on_target_on_swdp_scan(void);
 #endif /* POWER_ON_WHEN_SWDP_SCAN */
 
 
-#define NOT_USED	0	//Only for pin. The ports should always be defined, even if it's not used
+
 #define JTAG_PORT 	GPIOA
 #define TDI_PORT	JTAG_PORT
 #define TMS_PORT	JTAG_PORT
 #define TCK_PORT	JTAG_PORT
 #define TDO_PORT	JTAG_PORT
-#define TDI_PIN		JTAG_PORT
-#define TMS_PIN		NOT_USED
-#define TCK_PIN		NOT_USED
-#define TDO_PIN		NOT_USED
+#define TDI_PIN		0
+#define TMS_PIN		0
+#define TCK_PIN		0
+#define TDO_PIN		0
 
 #define SWDIO_PORT 	JTAG_PORT
 #define SWCLK_PORT 	JTAG_PORT
@@ -95,19 +95,19 @@ void turn_on_target_on_swdp_scan(void);
 #define SWCLK_PIN	TCK_PIN
 
 #define TRST_PORT	JTAG_PORT
-#define TRST_PIN	NOT_USED
-#define SRST_PORT	GPIOB
-#define SRST_PIN	NOT_USED
+#define TRST_PIN	0
+#define SRST_PORT	GPIOA
+#define SRST_PIN	0
 
 #define LED_PORT_ERROR		GPIOA //RED_LED
 #define LED_PORT_UART		GPIOA //BLUE_LED
 #define LED_PORT			GPIOA //GREEN_LED
 
 
-#define LED_ERROR		NOT_USED	
-#define LED_UART		NOT_USED	
-#define LED_IDLE_RUN	NOT_USED	
-#define LED_BOOTLOADER	NOT_USED
+#define LED_ERROR		0	
+#define LED_UART		0	
+#define LED_IDLE_RUN	0	
+#define LED_BOOTLOADER	0
 
 #define TMS_SET_MODE() {palSetPadMode(TMS_PORT, SWDIO_PIN, PAL_MODE_OUTPUT_PUSHPULL);}
 

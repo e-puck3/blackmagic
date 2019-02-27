@@ -47,7 +47,7 @@ void gdb_if_putchar(unsigned char c, int flush)
 		}
 #ifdef USE_SECOND_GDB_INTERFACE
 		//send to the second GDB interface if it is active and connected
-		if( is_second_gdb_interface_active() && is_second_gdb_interface_connected() ) {
+		if( platform_is_second_gdb_interface_active() && platform_is_second_gdb_interface_connected() ) {
 			chnWrite((BaseChannel *) &GDB_2ND_INTERFACE, buffer_in, count_in);
 		}
 #endif /* USE_SECOND_GDB_INTERFACE */
@@ -59,7 +59,7 @@ void gdb_if_putchar(unsigned char c, int flush)
 static void gdb_if_update_buf(uint32_t timeout)
 {
 #ifdef USE_SECOND_GDB_INTERFACE
-	while ( !isUSBConfigured() && !is_second_gdb_interface_connected() ){
+	while ( !isUSBConfigured() && !platform_is_second_gdb_interface_connected() ){
 #else
 	while ( !isUSBConfigured() ){
 #endif /* USE_SECOND_GDB_INTERFACE */
@@ -69,7 +69,7 @@ static void gdb_if_update_buf(uint32_t timeout)
 	count_out = chnReadTimeout((BaseChannel *) &USB_GDB, buffer_out, USB_DATA_SIZE, timeout);
 
 #ifdef USE_SECOND_GDB_INTERFACE
-	if(count_out == 0 && is_second_gdb_interface_active() ){
+	if(count_out == 0 && platform_is_second_gdb_interface_active() ){
 		count_out = chnReadTimeout((BaseChannel *) &GDB_2ND_INTERFACE, buffer_out, USB_DATA_SIZE, timeout);
 	}
 #endif /* USE_SECOND_GDB_INTERFACE */
@@ -82,7 +82,7 @@ unsigned char gdb_if_getchar(void)
 	while (!(out_ptr < count_out)) {
 		/* Detach if port closed */
 #ifdef USE_SECOND_GDB_INTERFACE
-		if ( !getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR) && !is_second_gdb_interface_connected() )
+		if ( !getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR) && !platform_is_second_gdb_interface_connected() )
 #else
 		if ( !getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR) )
 #endif /* USE_SECOND_GDB_INTERFACE */
@@ -102,7 +102,7 @@ unsigned char gdb_if_getchar_to(int timeout)
 	if (!(out_ptr < count_out)) do {
 		/* Detach if port closed */
 #ifdef USE_SECOND_GDB_INTERFACE
-		if ( !getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR) && !is_second_gdb_interface_connected() )
+		if ( !getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR) && !platform_is_second_gdb_interface_connected() )
 #else
 		if ( !getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR) )
 #endif /* USE_SECOND_GDB_INTERFACE */
