@@ -10,6 +10,6 @@ include $(BLACKMAGIC)/src/platforms/stm32-ChibiOS/Blackmagic_ChibiOS.mk
 
 3) Copy the platform.h, platform.c and platform_commands.h files from the template folder, place them where you want in your project and modify what you need inside (mainly the pinout to use). Don't forget to include them in your makefile. platform_commands.h is used to add custom commands to GDB if you want.
 
-4) Use the usbcfg.c/.h files present in the template to configure the USB. They init two serial port so the microcontroler used should have at least 5 endpoints. You can also use your own usbcfg files but then you need to copy some defines and functions from the usbcfg files in the template folder in order to compile. GDB will use the first USB interfaced declared.
+4) Use the usbcfg.c/.h files present in the template to configure the USB. They init one or two serial port depending on the config you choose in the usbcfg.h file. You can also use your own usbcfg files but then you need to copy some defines and functions from the usbcfg files from the template folder in order to compile. GDB will use the first USB interface declared.
 
 5) It is possible to implement a second interface to use with GDB. For example the programmer of the e-puck2 robot uses the uart as secon interface for GDB. Since this UART is connected to the bluetooth, it means we can debug the robot by bluetooth or by USB. 
