@@ -221,7 +221,7 @@ static const uint8_t vcom_configuration_descriptor_data[] = {
     0x01,                                   /* bConfigurationValue.         */
     0,                                      /* iConfiguration.              */
     0x80,                                   /* bmAttributes. */
-    50                                      /* bMaxPower (100mA).           */
+    USB_POWER                               /* bMaxPower.                   */
   ),
 #ifdef USE_TWO_USB_SERIAL
   IAD_CDC_IF_DESC_SET(
