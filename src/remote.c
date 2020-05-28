@@ -282,6 +282,17 @@ void remotePacketProcessGEN(uint8_t i, char *packet)
 #endif
 		break;
 
+#ifdef USE_CHIBIOS
+#include "usbcfg.h"
+	case REMOTE_START:
+		_respondS(REMOTE_RESP_OK, USB_DEVICE_NAME USB_VENDOR_NAME);
+		break;
+
+    default:
+		_respond(REMOTE_RESP_ERR,REMOTE_ERROR_UNRECOGNISED);
+		break;
+    }
+#else
 #if !defined(BOARD_IDENT) && defined(PLATFORM_IDENT)
 # define BOARD_IDENT() PLATFORM_IDENT
 #endif
@@ -293,6 +304,7 @@ void remotePacketProcessGEN(uint8_t i, char *packet)
 		_respond(REMOTE_RESP_ERR,REMOTE_ERROR_UNRECOGNISED);
 		break;
     }
+#endif /* USE_CHIBIOS */
 }
 
 void remotePacketProcessHL(uint8_t i, char *packet)
@@ -399,11 +411,11 @@ void remotePacketProcess(uint8_t i, char *packet)
     case REMOTE_SWDP_PACKET:
 		remotePacketProcessSWD(i,packet);
 		break;
-
+#ifndef PLATFORM_HAS_NO_JTAG
     case REMOTE_JTAG_PACKET:
 		remotePacketProcessJTAG(i,packet);
 		break;
-
+#endif /* PLATFORM_HAS_NO_JTAG */
     case REMOTE_GEN_PACKET:
 		remotePacketProcessGEN(i,packet);
 		break;

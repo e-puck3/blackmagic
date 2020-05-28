@@ -1,1 +1,1 @@
-#define FIRMWARE_VERSION "v1.6.1-253-g21b5a04-dirty"
+#define FIRMWARE_VERSION "v1.6.2-rc0-8c8485c"

@@ -3,7 +3,7 @@
 
 NO_JTAG = 1
 
-ALLDEFS +=	-DUSE_CHIBIOS
+ALLDEFS +=	-DUSE_CHIBIOS -DPC_HOSTED=0
 
 ifdef NO_JTAG
 	ALLDEFS +=	-DPLATFORM_HAS_NO_JTAG
@@ -27,7 +27,7 @@ ALLCSRC += 	$(BLACKMAGIC)/src/target/adiv5.c    \
 			$(BLACKMAGIC)/src/gdb_packet.c  \
 			$(BLACKMAGIC)/src/hex_utils.c \
 			$(BLACKMAGIC)/src/morse.c   \
-			$(BLACKMAGIC)/src/target/swdptap_generic.c \
+			$(BLACKMAGIC)/src/remote.c \
 			$(BLACKMAGIC)/src/target/target.c  \
 			$(BLACKMAGIC)/src/target/stm32f4.c \
 			$(BLACKMAGIC)/src/platforms/common/timing.c  \
@@ -54,6 +54,8 @@ ALLCSRC += 	$(BLACKMAGIC)/src/target/adiv5.c    \
 			$(BLACKMAGIC)/src/target/lmi.c		\
 			$(BLACKMAGIC)/src/target/kinetis.c	\
 			$(BLACKMAGIC)/src/target/efm32.c \
+			$(BLACKMAGIC)/src/target/nxpke04.c \
+			$(BLACKMAGIC)/src/target/samx5x.c
 
 ifndef NO_JTAG
 	ALLCSRC +=	$(BLACKMAGIC)/src/target/adiv5_jtagdp.c \
