@@ -21,7 +21,7 @@
 #ifndef __GDB_IF_H
 #define __GDB_IF_H
 
-#if !defined(LIBFTDI) && !defined(USE_CHIBIOS)
+#if PC_HOSTED == 0 && !defined(USE_CHIBIOS)
 #include <libopencm3/usb/usbd.h>
 void gdb_usb_out_cb(usbd_device *dev, uint8_t ep);
 #endif

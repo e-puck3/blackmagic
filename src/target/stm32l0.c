@@ -236,6 +236,11 @@ static void stm32l_add_flash(target *t,
                              uint32_t addr, size_t length, size_t erasesize)
 {
 	struct target_flash *f = calloc(1, sizeof(*f));
+	if (!f) {			/* calloc failed: heap exhaustion */
+		DEBUG_WARN("calloc: failed in %s\n", __func__);
+		return;
+	}
+
 	f->start = addr;
 	f->length = length;
 	f->blocksize = erasesize;
@@ -248,6 +253,11 @@ static void stm32l_add_flash(target *t,
 static void stm32l_add_eeprom(target *t, uint32_t addr, size_t length)
 {
 	struct target_flash *f = calloc(1, sizeof(*f));
+	if (!f) {			/* calloc failed: heap exhaustion */
+		DEBUG_WARN("calloc: failed in %s\n", __func__);
+		return;
+	}
+
 	f->start = addr;
 	f->length = length;
 	f->blocksize = 4;
@@ -370,8 +380,10 @@ static int stm32lx_nvm_prog_erase(struct target_flash* f,
 	while (len > 0) {
 		/* Write first word of page to 0 */
 		target_mem_write32(t, addr, 0);
-
-		len  -= page_size;
+		if (len > page_size)
+			len  -= page_size;
+		else
+			len = 0;
 		addr += page_size;
 	}
 
@@ -432,7 +444,6 @@ static int stm32lx_nvm_prog_write(struct target_flash *f,
 	return 0;
 }
 
-
 /** Erase a region of data flash using operations through the debug
     interface .  The flash is erased for all pages from addr to
     addr+len, inclusive, on a word boundary.  NVM register file
@@ -464,7 +475,10 @@ static int stm32lx_nvm_data_erase(struct target_flash *f,
 		/* Write first word of page to 0 */
 		target_mem_write32(t, addr, 0);
 
-		len  -= page_size;
+		if (len > page_size)
+			len  -= page_size;
+		else
+			len = 0;
 		addr += page_size;
 	}
 
@@ -602,6 +616,8 @@ static bool stm32lx_cmd_option(target* t, int argc, char** argv)
                 return true;
         }
 
+        if (argc < 2 )
+                 goto usage;
         size_t cb = strlen(argv[1]);
 
         if (argc == 2 && !strncasecmp(argv[1], "obl_launch", cb)) {
@@ -631,10 +647,6 @@ static bool stm32lx_cmd_option(target* t, int argc, char** argv)
                 if (!stm32lx_option_write(t, addr, val))
                         tc_printf(t, "option write failed\n");
         }
-        else if (argc == 2 && !strncasecmp(argv[1], "show", cb))
-                ;
-        else
-                goto usage;
 
         /* Report the current option values */
         for(unsigned i = 0; i < opt_size; i += sizeof(uint32_t)) {

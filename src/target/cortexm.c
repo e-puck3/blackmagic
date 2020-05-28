@@ -2,7 +2,8 @@
  * This file is part of the Black Magic Debug project.
  *
  * Copyright (C) 2012  Black Sphere Technologies Ltd.
- * Written by Gareth McMullin <gareth@blacksphere.co.nz>
+ * Written by Gareth McMullin <gareth@blacksphere.co.nz>,
+ * Koen De Vleeschauwer and Uwe Bonne
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,6 +26,7 @@
  *
  * Also supports Cortex-M0 / ARMv6-M
  */
+
 #include "general.h"
 #include "exception.h"
 #include "adiv5.h"
@@ -32,8 +34,26 @@
 #include "target_internal.h"
 #include "cortexm.h"
 #include "platform.h"
+#include "command.h"
 
 #include <unistd.h>
+
+#if PC_HOSTED == 1
+
+/*
+ * pc-hosted semihosting does keyboard, file and screen i/o on the system
+ * where blackmagic_hosted runs, using linux system calls.
+ * semihosting in the probe does keyboard, file and screen i/o on the system
+ * where gdb runs, using gdb file i/o calls.
+ */
+
+#define TARGET_NULL ((target_addr)0)
+#include <errno.h>
+#include <time.h>
+#include <sys/time.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#endif
 
 static const char cortexm_driver_str[] = "ARM Cortex-M";
 
@@ -51,9 +71,12 @@ const struct command_s cortexm_cmd_list[] = {
 static void cortexm_regs_read(target *t, void *data);
 static void cortexm_regs_write(target *t, const void *data);
 static uint32_t cortexm_pc_read(target *t);
+static ssize_t cortexm_reg_read(target *t, int reg, void *data, size_t max);
+static ssize_t cortexm_reg_write(target *t, int reg, const void *data, size_t max);
 
 static void cortexm_reset(target *t);
 static enum target_halt_reason cortexm_halt_poll(target *t, target_addr *watch);
+static void cortexm_halt_resume(target *t, bool step);
 static void cortexm_halt_request(target *t);
 static int cortexm_fault_unwind(target *t);
 
@@ -65,6 +88,8 @@ static target_addr cortexm_check_watch(target *t);
 #define CORTEXM_MAX_BREAKPOINTS	6	/* architecture says up to 127, no implementation has > 6 */
 
 static int cortexm_hostio_request(target *t);
+
+static uint32_t time0_sec = UINT32_MAX; /* sys_clock time origin */
 
 struct cortexm_priv {
 	ADIv5_AP_t *ap;
@@ -263,8 +288,18 @@ bool cortexm_probe(ADIv5_AP_t *ap, bool forced)
 	target *t;
 
 	t = target_new();
+	if (!t) {
+		return false;
+	}
+
 	adiv5_ap_ref(ap);
+	uint32_t identity = ap->idr & 0xff;
 	struct cortexm_priv *priv = calloc(1, sizeof(*priv));
+	if (!priv) {			/* calloc failed: heap exhaustion */
+		DEBUG_WARN("calloc: failed in %s\n", __func__);
+		return false;
+	}
+
 	t->priv = priv;
 	t->priv_free = cortexm_priv_free;
 	priv->ap = ap;
@@ -274,6 +309,20 @@ bool cortexm_probe(ADIv5_AP_t *ap, bool forced)
 	t->mem_write = cortexm_mem_write;
 
 	t->driver = cortexm_driver_str;
+	switch (identity) {
+	case 0x11: /* M3/M4 */
+		t->core = "M3/M4";
+		break;
+	case 0x21: /* M0 */
+		t->core = "M0";
+		break;
+	case 0x31: /* M0+ */
+		t->core = "M0+";
+		break;
+	case 0x01: /* M7 */
+		t->core = "M7";
+		break;
+	}
 
 	t->attach = cortexm_attach;
 	t->detach = cortexm_detach;
@@ -282,6 +331,8 @@ bool cortexm_probe(ADIv5_AP_t *ap, bool forced)
 	t->tdesc = tdesc_cortex_m;
 	t->regs_read = cortexm_regs_read;
 	t->regs_write = cortexm_regs_write;
+	t->reg_read = cortexm_reg_read;
+	t->reg_write = cortexm_reg_write;
 
 	t->reset = cortexm_reset;
 	t->halt_request = cortexm_halt_request;
@@ -340,10 +391,12 @@ bool cortexm_probe(ADIv5_AP_t *ap, bool forced)
 	PROBE(sam4l_probe);
 	PROBE(nrf51_probe);
 	PROBE(samd_probe);
+	PROBE(samx5x_probe);
 	PROBE(lmi_probe);
 	PROBE(kinetis_probe);
 	PROBE(efm32_probe);
 	PROBE(msp432_probe);
+	PROBE(ke04_probe);
 	PROBE(lpc17xx_probe);
 #undef PROBE
 
@@ -422,67 +475,101 @@ enum { DB_DHCSR, DB_DCRSR, DB_DCRDR, DB_DEMCR };
 
 static void cortexm_regs_read(target *t, void *data)
 {
-	ADIv5_AP_t *ap = cortexm_ap(t);
 	uint32_t *regs = data;
+	ADIv5_AP_t *ap = cortexm_ap(t);
 	unsigned i;
-
-	/* FIXME: Describe what's really going on here */
-	adiv5_ap_write(ap, ADIV5_AP_CSW, ap->csw | ADIV5_AP_CSW_SIZE_WORD);
-
-	/* Map the banked data registers (0x10-0x1c) to the
-	 * debug registers DHCSR, DCRSR, DCRDR and DEMCR respectively */
-	adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE, ADIV5_AP_TAR, CORTEXM_DHCSR);
-
-	/* Walk the regnum_cortex_m array, reading the registers it
-	 * calls out. */
-	adiv5_ap_write(ap, ADIV5_AP_DB(DB_DCRSR), regnum_cortex_m[0]); /* Required to switch banks */
-	*regs++ = adiv5_dp_read(ap->dp, ADIV5_AP_DB(DB_DCRDR));
-	for(i = 1; i < sizeof(regnum_cortex_m) / 4; i++) {
-		adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE, ADIV5_AP_DB(DB_DCRSR),
-		                    regnum_cortex_m[i]);
-		*regs++ = adiv5_dp_read(ap->dp, ADIV5_AP_DB(DB_DCRDR));
+#if PC_HOSTED == 1
+	if ((ap->dp->ap_reg_read) && (ap->dp->ap_regs_read)) {
+		uint32_t base_regs[21];
+		ap->dp->ap_regs_read(ap, base_regs);
+		for(i = 0; i < sizeof(regnum_cortex_m) / 4; i++)
+			*regs++ = base_regs[regnum_cortex_m[i]];
+		if (t->target_options & TOPT_FLAVOUR_V7MF)
+			for(size_t t = 0; t < sizeof(regnum_cortex_mf) / 4; t++)
+			*regs++ = ap->dp->ap_reg_read(ap, regnum_cortex_mf[t]);
 	}
-	if (t->target_options & TOPT_FLAVOUR_V7MF)
-		for(i = 0; i < sizeof(regnum_cortex_mf) / 4; i++) {
-			adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE,
-			                    ADIV5_AP_DB(DB_DCRSR),
-			                    regnum_cortex_mf[i]);
-			*regs++ = adiv5_dp_read(ap->dp, ADIV5_AP_DB(DB_DCRDR));
+#else
+	if (0) {}
+#endif
+	else {
+		/* FIXME: Describe what's really going on here */
+		adiv5_ap_write(ap, ADIV5_AP_CSW, ap->csw | ADIV5_AP_CSW_SIZE_WORD);
+
+		/* Map the banked data registers (0x10-0x1c) to the
+		 * debug registers DHCSR, DCRSR, DCRDR and DEMCR respectively */
+		adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE, ADIV5_AP_TAR,
+							CORTEXM_DHCSR);
+
+		/* Walk the regnum_cortex_m array, reading the registers it
+		 * calls out. */
+		adiv5_ap_write(ap, ADIV5_AP_DB(DB_DCRSR), regnum_cortex_m[0]);
+       /* Required to switch banks */
+		*regs++ = adiv5_dp_read(ap->dp, ADIV5_AP_DB(DB_DCRDR));
+		for(i = 1; i < sizeof(regnum_cortex_m) / 4; i++) {
+		adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE, ADIV5_AP_DB(DB_DCRSR),
+			regnum_cortex_m[i]);
+		*regs++ = adiv5_dp_read(ap->dp, ADIV5_AP_DB(DB_DCRDR));
+		}
+		if (t->target_options & TOPT_FLAVOUR_V7MF)
+			for(i = 0; i < sizeof(regnum_cortex_mf) / 4; i++) {
+				adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE,
+									ADIV5_AP_DB(DB_DCRSR),
+									regnum_cortex_mf[i]);
+				*regs++ = adiv5_dp_read(ap->dp, ADIV5_AP_DB(DB_DCRDR));
+			}
 		}
 }
 
 static void cortexm_regs_write(target *t, const void *data)
 {
-	ADIv5_AP_t *ap = cortexm_ap(t);
 	const uint32_t *regs = data;
-	unsigned i;
-
-	/* FIXME: Describe what's really going on here */
-	adiv5_ap_write(ap, ADIV5_AP_CSW, ap->csw | ADIV5_AP_CSW_SIZE_WORD);
-
-	/* Map the banked data registers (0x10-0x1c) to the
-	 * debug registers DHCSR, DCRSR, DCRDR and DEMCR respectively */
-	adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE, ADIV5_AP_TAR, CORTEXM_DHCSR);
-
-	/* Walk the regnum_cortex_m array, writing the registers it
-	 * calls out. */
-	adiv5_ap_write(ap, ADIV5_AP_DB(DB_DCRDR), *regs++); /* Required to switch banks */
-	adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE, ADIV5_AP_DB(DB_DCRSR),
-	                    0x10000 | regnum_cortex_m[0]);
-	for(i = 1; i < sizeof(regnum_cortex_m) / 4; i++) {
-		adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE,
-		                    ADIV5_AP_DB(DB_DCRDR), *regs++);
-		adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE, ADIV5_AP_DB(DB_DCRSR),
-		                    0x10000 | regnum_cortex_m[i]);
-	}
-	if (t->target_options & TOPT_FLAVOUR_V7MF)
-		for(i = 0; i < sizeof(regnum_cortex_mf) / 4; i++) {
-			adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE,
-			                    ADIV5_AP_DB(DB_DCRDR), *regs++);
-			adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE,
-			                    ADIV5_AP_DB(DB_DCRSR),
-			                    0x10000 | regnum_cortex_mf[i]);
+	ADIv5_AP_t *ap = cortexm_ap(t);
+#if PC_HOSTED == 1
+	if (ap->dp->ap_reg_write) {
+		for (size_t z = 0; z < sizeof(regnum_cortex_m) / 4; z++) {
+			ap->dp->ap_reg_write(ap, regnum_cortex_m[z], *regs);
+			regs++;
 		}
+		if (t->target_options & TOPT_FLAVOUR_V7MF)
+			for(size_t z = 0; z < sizeof(regnum_cortex_mf) / 4; z++) {
+				ap->dp->ap_reg_write(ap, regnum_cortex_mf[z], *regs);
+				regs++;
+			}
+	}
+#else
+	if (0) {}
+#endif
+	else {
+		unsigned i;
+
+		/* FIXME: Describe what's really going on here */
+		adiv5_ap_write(ap, ADIV5_AP_CSW, ap->csw | ADIV5_AP_CSW_SIZE_WORD);
+
+		/* Map the banked data registers (0x10-0x1c) to the
+		 * debug registers DHCSR, DCRSR, DCRDR and DEMCR respectively */
+		adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE, ADIV5_AP_TAR,
+							CORTEXM_DHCSR);
+		/* Walk the regnum_cortex_m array, writing the registers it
+		 * calls out. */
+		adiv5_ap_write(ap, ADIV5_AP_DB(DB_DCRDR), *regs++);
+        /* Required to switch banks */
+		adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE, ADIV5_AP_DB(DB_DCRSR),
+							0x10000 | regnum_cortex_m[0]);
+		for(i = 1; i < sizeof(regnum_cortex_m) / 4; i++) {
+			adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE,
+								ADIV5_AP_DB(DB_DCRDR), *regs++);
+			adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE, ADIV5_AP_DB(DB_DCRSR),
+								0x10000 | regnum_cortex_m[i]);
+		}
+		if (t->target_options & TOPT_FLAVOUR_V7MF)
+			for(i = 0; i < sizeof(regnum_cortex_mf) / 4; i++) {
+				adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE,
+									ADIV5_AP_DB(DB_DCRDR), *regs++);
+				adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE,
+									ADIV5_AP_DB(DB_DCRSR),
+									0x10000 | regnum_cortex_mf[i]);
+			}
+	}
 }
 
 int cortexm_mem_write_sized(
@@ -491,6 +578,39 @@ int cortexm_mem_write_sized(
 	cortexm_cache_clean(t, dest, len, true);
 	adiv5_mem_write_sized(cortexm_ap(t), dest, src, len, align);
 	return target_check_error(t);
+}
+
+static int dcrsr_regnum(target *t, unsigned reg)
+{
+	if (reg < sizeof(regnum_cortex_m) / 4) {
+		return regnum_cortex_m[reg];
+	} else if ((t->target_options & TOPT_FLAVOUR_V7MF) &&
+	           (reg < (sizeof(regnum_cortex_m) +
+	                   sizeof(regnum_cortex_mf) / 4))) {
+		return regnum_cortex_mf[reg - sizeof(regnum_cortex_m)/4];
+	} else {
+		return -1;
+	}
+}
+static ssize_t cortexm_reg_read(target *t, int reg, void *data, size_t max)
+{
+	if (max < 4)
+		return -1;
+	uint32_t *r = data;
+	target_mem_write32(t, CORTEXM_DCRSR, dcrsr_regnum(t, reg));
+	*r = target_mem_read32(t, CORTEXM_DCRDR);
+	return 4;
+}
+
+static ssize_t cortexm_reg_write(target *t, int reg, const void *data, size_t max)
+{
+	if (max < 4)
+		return -1;
+	const uint32_t *r = data;
+	target_mem_write32(t, CORTEXM_DCRDR, *r);
+	target_mem_write32(t, CORTEXM_DCRSR, CORTEXM_DCRSR_REGWnR |
+	                                     dcrsr_regnum(t, reg));
+	return 4;
 }
 
 static uint32_t cortexm_pc_read(target *t)
@@ -509,36 +629,43 @@ static void cortexm_pc_write(target *t, const uint32_t val)
  * using the core debug registers in the NVIC. */
 static void cortexm_reset(target *t)
 {
+	/* Read DHCSR here to clear S_RESET_ST bit before reset */
+	target_mem_read32(t, CORTEXM_DHCSR);
+	platform_timeout to;
 	if ((t->target_options & CORTEXM_TOPT_INHIBIT_SRST) == 0) {
 		platform_srst_set_val(true);
 		platform_srst_set_val(false);
+		/* Some NRF52840 users saw invalid SWD transaction with
+		 * native/firmware without this delay.*/
+		platform_delay(10);
 	}
-
-	/* Read DHCSR here to clear S_RESET_ST bit before reset */
-	target_mem_read32(t, CORTEXM_DHCSR);
-
-	/* Request system reset from NVIC: SRST doesn't work correctly */
-	/* This could be VECTRESET: 0x05FA0001 (reset only core)
-	 *          or SYSRESETREQ: 0x05FA0004 (system reset)
-	 */
-	target_mem_write32(t, CORTEXM_AIRCR,
-	                   CORTEXM_AIRCR_VECTKEY | CORTEXM_AIRCR_SYSRESETREQ);
-
+	uint32_t dhcsr = target_mem_read32(t, CORTEXM_DHCSR);
+	if ((dhcsr & CORTEXM_DHCSR_S_RESET_ST) == 0) {
+		/* No reset seen yet, maybe as SRST is not connected, or device has
+         * CORTEXM_TOPT_INHIBIT_SRST set.
+		 * Trigger reset by AIRCR.*/
+		target_mem_write32(t, CORTEXM_AIRCR,
+						   CORTEXM_AIRCR_VECTKEY | CORTEXM_AIRCR_SYSRESETREQ);
+	}
 	/* If target needs to do something extra (see Atmel SAM4L for example) */
 	if (t->extended_reset != NULL) {
 		t->extended_reset(t);
 	}
-
-	/* Poll for release from reset */
-	while (target_mem_read32(t, CORTEXM_DHCSR) & CORTEXM_DHCSR_S_RESET_ST);
-
+	/* Wait for CORTEXM_DHCSR_S_RESET_ST to read 0, meaning reset released.*/
+	platform_timeout_set(&to, 1000);
+	while ((target_mem_read32(t, CORTEXM_DHCSR) & CORTEXM_DHCSR_S_RESET_ST) &&
+		   !platform_timeout_is_expired(&to));
+#if defined(PLATFORM_HAS_DEBUG)
+	if (platform_timeout_is_expired(&to))
+		DEBUG_WARN("Reset seem to be stuck low!\n");
+#endif
+	/* 10 ms delay to ensure that things such as the STM32 HSI clock
+	 * have started up fully. */
+	platform_delay(10);
 	/* Reset DFSR flags */
 	target_mem_write32(t, CORTEXM_DFSR, CORTEXM_DFSR_RESETALL);
-
-	/* 1ms delay to ensure that things such as the stm32f1 HSI clock have started
-	 * up fully.
-	 */
-	platform_delay(1);
+	/* Make sure we ignore any initial DAP error */
+	target_check_error(t);
 }
 
 static void cortexm_halt_request(target *t)
@@ -617,7 +744,7 @@ static enum target_halt_reason cortexm_halt_poll(target *t, target_addr *watch)
 	return TARGET_HALT_BREAKPOINT;
 }
 
-void cortexm_halt_resume(target *t, bool step)
+static void cortexm_halt_resume(target *t, bool step)
 {
 	struct cortexm_priv *priv = t->priv;
 	uint32_t dhcsr = CORTEXM_DHCSR_DBGKEY | CORTEXM_DHCSR_C_DEBUGEN;
@@ -873,7 +1000,7 @@ static bool cortexm_vector_catch(target *t, int argc, char *argv[])
 	uint32_t tmp = 0;
 	unsigned i;
 
-	if ((argc < 3) || ((argv[1][0] != 'e') && (argv[1][0] != 'd'))) {
+	if (argc < 3) {
 		tc_printf(t, "usage: monitor vector_catch (enable|disable) "
 			     "(hard|int|bus|stat|chk|nocp|mm|reset)\n");
 	} else {
@@ -883,12 +1010,16 @@ static bool cortexm_vector_catch(target *t, int argc, char *argv[])
 					tmp |= 1 << i;
 			}
 
-		if (argv[1][0] == 'e')
-			priv->demcr |= tmp;
-		else
-			priv->demcr &= ~tmp;
+		bool enable;
+		if (parse_enable_or_disable(argv[1], &enable)) {
+			if (enable) {
+				priv->demcr |= tmp;
+			} else {
+				priv->demcr &= ~tmp;
+			}
 
-		target_mem_write32(t, CORTEXM_DEMCR, priv->demcr);
+			target_mem_write32(t, CORTEXM_DEMCR, priv->demcr);
+		}
 	}
 
 	tc_printf(t, "Catching vectors: ");
@@ -908,11 +1039,25 @@ static bool cortexm_vector_catch(target *t, int argc, char *argv[])
 #endif
 
 /* Semihosting support */
-/* ARM Semihosting syscall numbers, from ARM doc DUI0471C, Chapter 8 */
-#define SYS_CLOSE	0x02
+
+/*
+ * If the target wants to read the special filename ":semihosting-features"
+ * to know what semihosting features are supported, it's easiest to create
+ * that file on the host in the directory where gdb runs,
+ * or, if using pc-hosted, where blackmagic_hosted runs.
+ *
+ * $ echo -e 'SHFB\x03' > ":semihosting-features"
+ * $ chmod 0444 ":semihosting-features"
+ */
+
+/* ARM Semihosting syscall numbers, from "Semihosting for AArch32 and AArch64 Version 3.0" */
+
 #define SYS_CLOCK	0x10
+#define SYS_CLOSE	0x02
 #define SYS_ELAPSED	0x30
 #define SYS_ERRNO	0x13
+#define SYS_EXIT	0x18
+#define SYS_EXIT_EXTENDED	0x20
 #define SYS_FLEN	0x0C
 #define SYS_GET_CMDLINE	0x15
 #define SYS_HEAPINFO	0x16
@@ -932,6 +1077,29 @@ static bool cortexm_vector_catch(target *t, int argc, char *argv[])
 #define SYS_WRITEC	0x03
 #define SYS_WRITE0	0x04
 
+#if PC_HOSTED == 0
+/* probe memory access functions */
+static void probe_mem_read(target *t __attribute__((unused)), void *probe_dest, target_addr target_src, size_t len)
+{
+	uint8_t *dst = (uint8_t *)probe_dest;
+	uint8_t *src = (uint8_t *)target_src;
+
+	DEBUG_INFO("probe_mem_read\n");
+	while (len--) *dst++=*src++;
+	return;
+}
+
+static void probe_mem_write(target *t __attribute__((unused)), target_addr target_dest, const void *probe_src, size_t len)
+{
+	uint8_t *dst = (uint8_t *)target_dest;
+	uint8_t *src = (uint8_t *)probe_src;
+
+	DEBUG_INFO("probe_mem_write\n");
+	while (len--) *dst++=*src++;
+	return;
+}
+#endif
+
 static int cortexm_hostio_request(target *t)
 {
 	uint32_t arm_regs[t->regs_size];
@@ -943,9 +1111,230 @@ static int cortexm_hostio_request(target *t)
 	uint32_t syscall = arm_regs[0];
 	int32_t ret = 0;
 
-	DEBUG("syscall 0"PRIx32"%"PRIx32" (%"PRIx32" %"PRIx32" %"PRIx32" %"PRIx32")\n",
+	DEBUG_INFO("syscall 0"PRIx32"%"PRIx32" (%"PRIx32" %"PRIx32" %"PRIx32" %"PRIx32")\n",
               syscall, params[0], params[1], params[2], params[3]);
 	switch (syscall) {
+#if PC_HOSTED == 1
+
+	/* code that runs in pc-hosted process. use linux system calls. */
+
+	case SYS_OPEN:{	/* open */
+		target_addr fnam_taddr =  params[0];
+		uint32_t fnam_len = params[2];
+		ret = -1;
+		if ((fnam_taddr == TARGET_NULL) || (fnam_len == 0)) break;
+
+		/* Translate stupid fopen modes to open flags.
+		 * See DUI0471C, Table 8-3 */
+		const uint32_t flags[] = {
+			O_RDONLY,	/* r, rb */
+			O_RDWR,		/* r+, r+b */
+			O_WRONLY | O_CREAT | O_TRUNC,/*w*/
+			O_RDWR | O_CREAT | O_TRUNC,/*w+*/
+			O_WRONLY | O_CREAT | O_APPEND,/*a*/
+			O_RDWR | O_CREAT | O_APPEND,/*a+*/
+		};
+		uint32_t pflag = flags[params[1] >> 1];
+		char filename[4];
+
+		target_mem_read(t, filename, fnam_taddr, sizeof(filename));
+		/* handle requests for console i/o */
+		if (!strcmp(filename, ":tt")) {
+			if (pflag == TARGET_O_RDONLY)
+				ret = STDIN_FILENO;
+			else if (pflag & TARGET_O_TRUNC)
+				ret = STDOUT_FILENO;
+			else
+				ret = STDERR_FILENO;
+			ret++;
+			break;
+		}
+
+		char *fnam = malloc(fnam_len + 1);
+		if (fnam == NULL) break;
+		target_mem_read(t, fnam, fnam_taddr, fnam_len + 1);
+		if (target_check_error(t)) {free(fnam); break;}
+		fnam[fnam_len]='\0';
+		ret = open(fnam, pflag, 0644);
+		free(fnam);
+		if (ret != -1)
+			ret++;
+		break;
+		}
+
+	case SYS_CLOSE:	/* close */
+		ret = close(params[0] - 1);
+		break;
+
+	case SYS_READ: { /* read */
+		ret = -1;
+		target_addr buf_taddr = params[1];
+		uint32_t buf_len = params[2];
+		if (buf_taddr == TARGET_NULL) break;
+		if (buf_len == 0) {ret = 0; break;}
+		uint8_t *buf = malloc(buf_len);
+		if (buf == NULL) break;
+		ssize_t rc = read(params[0] - 1, buf, buf_len);
+		if (rc >= 0)
+			rc = buf_len - rc;
+		target_mem_write(t, buf_taddr, buf, buf_len);
+		free(buf);
+		if (target_check_error(t)) break;
+		ret = rc;
+		break;
+		}
+
+	case SYS_WRITE:	{ /* write */
+		ret = -1;
+		target_addr buf_taddr = params[1];
+		uint32_t buf_len = params[2];
+		if (buf_taddr == TARGET_NULL) break;
+		if (buf_len == 0) {ret = 0; break;}
+		uint8_t *buf = malloc(buf_len);
+		if (buf == NULL) break;
+		target_mem_read(t, buf, buf_taddr, buf_len);
+		if (target_check_error(t)) {free(buf); break;}
+		ret = write(params[0] - 1, buf, buf_len);
+		free(buf);
+		if (ret >= 0)
+			ret = buf_len - ret;
+		break;
+		}
+
+	case SYS_WRITEC: { /* writec */
+		ret = -1;
+		uint8_t ch;
+		target_addr ch_taddr = arm_regs[1];
+		if (ch_taddr == TARGET_NULL) break;
+		ch = target_mem_read8(t, ch_taddr);
+		if (target_check_error(t)) break;
+		fputc(ch, stderr);
+		ret = 0;
+		break;
+		}
+
+	case SYS_WRITE0:{ /* write0 */
+		ret = -1;
+		uint8_t ch;
+		target_addr str = arm_regs[1];
+		if (str == TARGET_NULL) break;
+		while ((ch = target_mem_read8(t, str++)) != '\0') {
+			if (target_check_error(t)) break;
+			fputc(ch, stderr);
+			}
+		ret = 0;
+		break;
+		}
+
+	case SYS_ISTTY:	/* isatty */
+		ret = isatty(params[0] - 1);
+		break;
+
+	case SYS_SEEK:{	/* lseek */
+		off_t pos = params[1];
+		if (lseek(params[0] - 1, pos, SEEK_SET) == (off_t)pos) ret = 0;
+		else ret = -1;
+		break;
+		}
+
+	case SYS_RENAME: { /* rename */
+		ret = -1;
+		target_addr fnam1_taddr = params[0];
+		uint32_t fnam1_len = params[1];
+		if (fnam1_taddr == TARGET_NULL) break;
+		if (fnam1_len == 0) break;
+		target_addr fnam2_taddr = params[2];
+		uint32_t fnam2_len = params[3];
+		if (fnam2_taddr == TARGET_NULL) break;
+		if (fnam2_len == 0) break;
+		char *fnam1 = malloc(fnam1_len + 1);
+		if (fnam1 == NULL) break;
+		target_mem_read(t, fnam1, fnam1_taddr, fnam1_len + 1);
+		if (target_check_error(t)) {free(fnam1); break;}
+		fnam1[fnam1_len]='\0';
+		char *fnam2 = malloc(fnam2_len + 1);
+		if (fnam2 == NULL) {free(fnam1); break;}
+		target_mem_read(t, fnam2, fnam2_taddr, fnam2_len + 1);
+		if (target_check_error(t)) {free(fnam1); free(fnam2); break;}
+		fnam2[fnam2_len]='\0';
+		ret = rename(fnam1, fnam2);
+		free(fnam1);
+		free(fnam2);
+		break;
+		}
+
+	case SYS_REMOVE: { /* unlink */
+		ret = -1;
+		target_addr fnam_taddr = params[0];
+		if (fnam_taddr == TARGET_NULL) break;
+		uint32_t fnam_len = params[1];
+		if (fnam_len == 0) break;
+		char *fnam = malloc(fnam_len + 1);
+		if (fnam == NULL) break;
+		target_mem_read(t, fnam, fnam_taddr, fnam_len + 1);
+		if (target_check_error(t)) {free(fnam); break;}
+		fnam[fnam_len]='\0';
+		ret = remove(fnam);
+		free(fnam);
+		break;
+		}
+
+	case SYS_SYSTEM: { /* system */
+		ret = -1;
+		target_addr cmd_taddr = params[0];
+		if (cmd_taddr == TARGET_NULL) break;
+		uint32_t cmd_len = params[1];
+		if (cmd_len == 0) break;
+		char *cmd = malloc(cmd_len + 1);
+		if (cmd == NULL) break;
+		target_mem_read(t, cmd, cmd_taddr, cmd_len + 1);
+		if (target_check_error(t)) {free(cmd); break;}
+		cmd[cmd_len]='\0';
+		ret = system(cmd);
+		free(cmd);
+		break;
+		}
+
+	case SYS_FLEN: { /* file length */
+		ret = -1;
+		struct stat stat_buf;
+		if (fstat(params[0]-1, &stat_buf) != 0) break;
+		if (stat_buf.st_size > INT32_MAX) break;
+		ret = stat_buf.st_size;
+		break;
+		}
+
+	case SYS_CLOCK: { /* clock */
+		/* can't use clock() because that would give cpu time of pc-hosted process */
+		ret = -1;
+		struct timeval timeval_buf;
+		if(gettimeofday(&timeval_buf, NULL) != 0) break;
+		uint32_t sec = timeval_buf.tv_sec;
+		uint64_t usec = timeval_buf.tv_usec;
+		if (time0_sec > sec) time0_sec = sec;
+		sec -= time0_sec;
+		uint64_t csec64 = (sec * 1000000ull + usec)/10000ull;
+		uint32_t csec = csec64 & 0x7fffffff;
+		ret = csec;
+		break;
+		}
+
+	case SYS_TIME: /* time */
+		ret = time(NULL);
+		break;
+
+	case SYS_READC: /* readc */
+		ret = getchar();
+		break;
+
+	case SYS_ERRNO: /* errno */
+		ret = errno;
+		break;
+
+#else
+
+	/* code that runs in probe. use gdb fileio calls. */
+
 	case SYS_OPEN:{	/* open */
 		/* Translate stupid fopen modes to open flags.
 		 * See DUI0471C, Table 8-3 */
@@ -978,50 +1367,215 @@ static int cortexm_hostio_request(target *t)
 			ret++;
 		break;
 		}
+
 	case SYS_CLOSE:	/* close */
 		ret = tc_close(t, params[0] - 1);
 		break;
 	case SYS_READ:	/* read */
 		ret = tc_read(t, params[0] - 1, params[1], params[2]);
-		if (ret > 0)
+		if (ret >= 0)
 			ret = params[2] - ret;
 		break;
 	case SYS_WRITE:	/* write */
 		ret = tc_write(t, params[0] - 1, params[1], params[2]);
-		if (ret > 0)
+		if (ret >= 0)
 			ret = params[2] - ret;
 		break;
 	case SYS_WRITEC: /* writec */
-		ret = tc_write(t, 2, arm_regs[1], 1);
+		ret = tc_write(t, STDERR_FILENO, arm_regs[1], 1);
 		break;
+	case SYS_WRITE0:{ /* write0 */
+		ret = -1;
+		target_addr str_begin = arm_regs[1];
+		target_addr str_end = str_begin;
+		while (target_mem_read8(t, str_end) != 0) {
+			if (target_check_error(t)) break;
+			str_end++;
+			}
+		int len = str_end - str_begin;
+		if (len != 0) {
+			int rc = tc_write(t, STDERR_FILENO, str_begin, len);
+			if (rc != len) break;
+		}
+		ret = 0;
+		break;
+		}
 	case SYS_ISTTY:	/* isatty */
 		ret = tc_isatty(t, params[0] - 1);
 		break;
 	case SYS_SEEK:	/* lseek */
-		ret = tc_lseek(t, params[0] - 1, params[1], TARGET_SEEK_SET);
+		if (tc_lseek(t, params[0] - 1, params[1], TARGET_SEEK_SET) == (long)params[1]) ret = 0;
+		else ret = -1;
 		break;
 	case SYS_RENAME:/* rename */
-		ret = tc_rename(t, params[0] - 1, params[1] + 1,
+		ret = tc_rename(t, params[0], params[1] + 1,
 				params[2], params[3] + 1);
 		break;
 	case SYS_REMOVE:/* unlink */
-		ret = tc_unlink(t, params[0] - 1, params[1] + 1);
+		ret = tc_unlink(t, params[0], params[1] + 1);
 		break;
 	case SYS_SYSTEM:/* system */
-		ret = tc_system(t, params[0] - 1, params[1] + 1);
+		/* before use first enable system calls with the following gdb command: 'set remote system-call-allowed 1' */
+		ret = tc_system(t, params[0], params[1] + 1);
 		break;
 
-	case SYS_FLEN:	/* Not supported, fake success */
-		t->tc->errno_ = 0;
+	case SYS_FLEN:
+		 {	/* file length */
+			 ret = -1;
+			 uint32_t fio_stat[16]; /* same size as fio_stat in gdb/include/gdb/fileio.h */
+			 //DEBUG("SYS_FLEN fio_stat addr %p\n", fio_stat);
+			 void (*saved_mem_read)(target *t, void *dest, target_addr src, size_t len);
+			 void (*saved_mem_write)(target *t, target_addr dest, const void *src, size_t len);
+			 saved_mem_read = t->mem_read;
+			 saved_mem_write = t->mem_write;
+			 t->mem_read = probe_mem_read;
+			 t->mem_write = probe_mem_write;
+			 int rc = tc_fstat(t, params[0] - 1, (target_addr)fio_stat); /* write fstat() result in fio_stat[] */
+			 t->mem_read = saved_mem_read;
+			 t->mem_write = saved_mem_write;
+			 if (rc) break; /* tc_fstat() failed */
+			 uint32_t fst_size_msw = fio_stat[7]; /* most significant 32 bits of fst_size in fio_stat */
+			 uint32_t fst_size_lsw = fio_stat[8]; /* least significant 32 bits of fst_size in fio_stat */
+			 if (fst_size_msw != 0) break; /* file size too large for int32_t return type */
+			 ret = __builtin_bswap32(fst_size_lsw); /* convert from bigendian to target order */
+			 if (ret < 0) ret = -1; /* file size too large for int32_t return type */
+			 break;
+		 }
+
+	case SYS_CLOCK: /* clock */
+	case SYS_TIME: { /* time */
+		/* use same code for SYS_CLOCK and SYS_TIME, more compact */
+		ret = -1;
+		struct __attribute__((packed, aligned(4))) {
+			uint32_t ftv_sec;
+			uint64_t ftv_usec;
+		} fio_timeval;
+		//DEBUG("SYS_TIME fio_timeval addr %p\n", &fio_timeval);
+		void (*saved_mem_read)(target *t, void *dest, target_addr src, size_t len);
+		void (*saved_mem_write)(target *t, target_addr dest, const void *src, size_t len);
+		saved_mem_read = t->mem_read;
+		saved_mem_write = t->mem_write;
+		t->mem_read = probe_mem_read;
+		t->mem_write = probe_mem_write;
+		int rc = tc_gettimeofday(t, (target_addr) &fio_timeval, (target_addr) NULL); /* write gettimeofday() result in fio_timeval[] */
+		t->mem_read = saved_mem_read;
+		t->mem_write = saved_mem_write;
+		if (rc) break; /* tc_gettimeofday() failed */
+		uint32_t sec = __builtin_bswap32(fio_timeval.ftv_sec); /* convert from bigendian to target order */
+		uint64_t usec = __builtin_bswap64(fio_timeval.ftv_usec);
+		if (syscall == SYS_TIME) { /* SYS_TIME: time in seconds */
+			ret = sec;
+		} else { /* SYS_CLOCK: time in hundredths of seconds */
+			if (time0_sec > sec) time0_sec = sec; /* set sys_clock time origin */
+			sec -= time0_sec;
+			uint64_t csec64 = (sec * 1000000ull + usec)/10000ull;
+			uint32_t csec = csec64 & 0x7fffffff;
+			ret = csec;
+		}
 		break;
+		}
+
+	case SYS_READC: { /* readc */
+		uint8_t ch='?';
+		//DEBUG("SYS_READC ch addr %p\n", &ch);
+		void (*saved_mem_read)(target *t, void *dest, target_addr src, size_t len);
+		void (*saved_mem_write)(target *t, target_addr dest, const void *src, size_t len);
+		saved_mem_read = t->mem_read;
+		saved_mem_write = t->mem_write;
+		t->mem_read = probe_mem_read;
+		t->mem_write = probe_mem_write;
+		int rc = tc_read(t, STDIN_FILENO, (target_addr) &ch, 1); /* read a character in ch */
+		t->mem_read = saved_mem_read;
+		t->mem_write = saved_mem_write;
+		if (rc == 1) ret = ch;
+		else ret = -1;
+		break;
+		}
 
 	case SYS_ERRNO: /* Return last errno from GDB */
 		ret = t->tc->errno_;
 		break;
+#endif
 
-	case SYS_TIME:	/* gettimeofday */
-		/* FIXME How do we use gdb's gettimeofday? */
+	case SYS_EXIT: /* _exit() */
+		tc_printf(t, "_exit(0x%x)\n", params[0]);
+		target_halt_resume(t, 1);
 		break;
+
+	case SYS_EXIT_EXTENDED: /* _exit() */
+		tc_printf(t, "_exit(0x%x%08x)\n", params[1], params[0]); /* exit() with 64bit exit value */
+		target_halt_resume(t, 1);
+		break;
+
+	case SYS_GET_CMDLINE: { /* get_cmdline */
+		uint32_t retval[2];
+		ret = -1;
+		target_addr buf_ptr = params[0];
+		target_addr buf_len = params[1];
+		if (strlen(t->cmdline)+1 > buf_len) break;
+		if(target_mem_write(t, buf_ptr, t->cmdline, strlen(t->cmdline)+1)) break;
+		retval[0] = buf_ptr;
+		retval[1] = strlen(t->cmdline)+1;
+		if(target_mem_write(t, arm_regs[1], retval, sizeof(retval))) break;
+		ret = 0;
+		break;
+		}
+
+	case SYS_ISERROR: { /* iserror */
+		int errorNo = params[0];
+		ret = (errorNo == TARGET_EPERM) ||
+			  (errorNo == TARGET_ENOENT) ||
+			  (errorNo == TARGET_EINTR) ||
+			  (errorNo == TARGET_EIO) ||
+			  (errorNo == TARGET_EBADF) ||
+			  (errorNo == TARGET_EACCES) ||
+			  (errorNo == TARGET_EFAULT) ||
+			  (errorNo == TARGET_EBUSY) ||
+			  (errorNo == TARGET_EEXIST) ||
+			  (errorNo == TARGET_ENODEV) ||
+			  (errorNo == TARGET_ENOTDIR) ||
+			  (errorNo == TARGET_EISDIR) ||
+			  (errorNo == TARGET_EINVAL) ||
+			  (errorNo == TARGET_ENFILE) ||
+			  (errorNo == TARGET_EMFILE) ||
+			  (errorNo == TARGET_EFBIG) ||
+			  (errorNo == TARGET_ENOSPC) ||
+			  (errorNo == TARGET_ESPIPE) ||
+			  (errorNo == TARGET_EROFS) ||
+			  (errorNo == TARGET_ENOSYS) ||
+			  (errorNo == TARGET_ENAMETOOLONG) ||
+			  (errorNo == TARGET_EUNKNOWN);
+		break;
+		}
+
+	case SYS_HEAPINFO: /* heapinfo */
+		target_mem_write(t, arm_regs[1], &t->heapinfo, sizeof(t->heapinfo)); /* See newlib/libc/sys/arm/crt0.S */
+		break;
+
+	case SYS_TMPNAM: { /* tmpnam */
+		/* Given a target identifier between 0 and 255, returns a temporary name */
+		target_addr buf_ptr = params[0];
+		int target_id = params[1];
+		int buf_size = params[2];
+		char fnam[]="tempXX.tmp";
+		ret = -1;
+		if (buf_ptr == 0) break;
+		if (buf_size <= 0) break;
+		if ((target_id < 0) || (target_id > 255)) break; /* target id out of range */
+		fnam[5]='A'+(target_id&0xF); /* create filename */
+		fnam[4]='A'+(target_id>>4&0xF);
+		if (strlen(fnam)+1>(uint32_t)buf_size) break; /* target buffer too small */
+		if(target_mem_write(t, buf_ptr, fnam, strlen(fnam)+1)) break; /* copy filename to target */
+		ret = 0;
+		break;
+		}
+
+	// not implemented yet:
+	case SYS_ELAPSED: /* elapsed */
+	case SYS_TICKFREQ: /* tickfreq */
+		ret = -1;
+		break;
+
 	}
 
 	arm_regs[0] = ret;
@@ -1029,4 +1583,3 @@ static int cortexm_hostio_request(target *t)
 
 	return t->tc->interrupted;
 }
-

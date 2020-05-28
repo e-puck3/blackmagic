@@ -27,4 +27,3 @@ struct platform_timeout {
 uint32_t platform_time_ms(void);
 
 #endif /* __TIMING_H */
-

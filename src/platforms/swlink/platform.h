@@ -33,6 +33,8 @@
 #ifdef ENABLE_DEBUG
 # define PLATFORM_HAS_DEBUG
 # define USBUART_DEBUG
+extern bool debug_bmp;
+int usbuart_debug_write(const char *buf, size_t len);
 #endif
 
 #define BOARD_IDENT			"Black Magic Probe (SWLINK), (Firmware " FIRMWARE_VERSION ")"
@@ -64,6 +66,7 @@
 
 #define PLATFORM_HAS_TRACESWO	1
 #define NUM_TRACE_PACKETS		(128)		/* This is an 8K buffer */
+#define TRACESWO_PROTOCOL		2			/* 1 = Manchester, 2 = NRZ / async */
 
 # define SWD_CR   GPIO_CRH(SWDIO_PORT)
 # define SWD_CR_MULT (1 << ((13 - 8) << 2))
@@ -121,14 +124,6 @@
 #define TRACE_IC_IN TIM_IC_IN_TI2
 #define TRACE_TRIG_IN TIM_SMCR_TS_IT1FP2
 
-#ifdef ENABLE_DEBUG
-extern bool debug_bmp;
-int usbuart_debug_write(const char *buf, size_t len);
-# define DEBUG printf
-#else
-# define DEBUG(...)
-#endif
-
 /* On F103, only USART1 is on AHB2 and can reach 4.5 MBaud at 72 MHz.
  * USART1 is already used. sp maximum speed is 2.25 MBaud. */
 #define SWO_UART				USART2
@@ -153,11 +148,38 @@ extern void set_idle_state(int state);
 
 extern uint8_t detect_rev(void);
 
-/* Use newlib provided integer only stdio functions */
+/*
+ * Use newlib provided integer only stdio functions
+ */
+
+/* sscanf */
+#ifdef sscanf
+#undef sscanf
 #define sscanf siscanf
+#else
+#define sscanf siscanf
+#endif
+/* sprintf */
+#ifdef sprintf
+#undef sprintf
 #define sprintf siprintf
+#else
+#define sprintf siprintf
+#endif
+/* vasprintf */
+#ifdef vasprintf
+#undef vasprintf
 #define vasprintf vasiprintf
+#else
+#define vasprintf vasiprintf
+#endif
+/* snprintf */
+#ifdef snprintf
+#undef snprintf
 #define snprintf sniprintf
+#else
+#define snprintf sniprintf
+#endif
 
 #endif
 

@@ -59,8 +59,14 @@ static char morse_repeat;
 
 void morse(const char *msg, char repeat)
 {
-	morse_msg = morse_ptr = msg;
+#if PC_HOSTED == 1
+	if (msg)
+		DEBUG_WARN("%s\n", msg);
+	(void) repeat;
+#else
+morse_msg = morse_ptr = msg;
 	morse_repeat = repeat;
+#endif
 }
 
 bool morse_update(void)

@@ -111,9 +111,6 @@ void platform_init(void)
 
 	platform_timing_init();
 	cdcacm_init();
-	/* Don't enable UART if we're being debugged. */
-	if (!(SCS_DEMCR & SCS_DEMCR_TRCENA))
-		usbuart_init();
 	usbuart_init();
 }
 
@@ -180,7 +177,7 @@ const char *platform_target_voltage(void)
 		ret[2] = '0' + val_in_100mV % 10;
 		return ret;
 	}
-	return "ABSENT!";
+	return NULL;
 }
 
 void set_idle_state(int state)

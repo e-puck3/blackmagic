@@ -26,6 +26,7 @@
 #include "gdb_if.h"
 #include "gdb_packet.h"
 #include "hex_utils.h"
+#include "remote.h"
 
 #include <stdarg.h>
 
@@ -37,9 +38,52 @@ int gdb_getpacket(char *packet, int size)
 	int i;
 
 	while(1) {
-		/* Wait for packet start */
-		while((packet[0] = gdb_if_getchar()) != '$')
-			if(packet[0] == 0x04) return 1;
+	    /* Wait for packet start */
+		do {
+			/* Spin waiting for a start of packet character - either a gdb
+             * start ('$') or a BMP remote packet start ('!').
+			 */
+			do {
+				packet[0] = gdb_if_getchar();
+				if (packet[0]==0x04) return 1;
+			} while ((packet[0] != '$') && (packet[0] != REMOTE_SOM));
+#if PC_HOSTED == 0
+			if (packet[0]==REMOTE_SOM) {
+				/* This is probably a remote control packet
+				 * - get and handle it */
+				i=0;
+				bool gettingRemotePacket=true;
+				while (gettingRemotePacket) {
+					c=gdb_if_getchar();
+					switch (c) {
+					case REMOTE_SOM: /* Oh dear, packet restarts */
+						i=0;
+						break;
+
+					case REMOTE_EOM: /* Complete packet for processing */
+						packet[i]=0;
+						remotePacketProcess(i,packet);
+						gettingRemotePacket=false;
+						break;
+
+					case '$': /* A 'real' gdb packet, best stop squatting now */
+						packet[0]='$';
+						gettingRemotePacket=false;
+						break;
+
+					default:
+						if (i<size) {
+							packet[i++]=c;
+						} else {
+							/* Who knows what is going on...return to normality */
+							gettingRemotePacket=false;
+						}
+						break;
+					}
+				}
+			}
+#endif
+	    } while (packet[0] != '$');
 
 		i = 0; csum = 0;
 		/* Capture packet data into buffer */
@@ -74,16 +118,16 @@ int gdb_getpacket(char *packet, int size)
 	gdb_if_putchar('+', 1); /* send ack */
 	packet[i] = 0;
 
-#ifdef DEBUG_GDBPACKET
-	DEBUG("%s : ", __func__);
+#if PC_HOSTED == 1
+	DEBUG_GDB_WIRE("%s : ", __func__);
 	for(int j = 0; j < i; j++) {
 		c = packet[j];
 		if ((c >= 32) && (c < 127))
-			DEBUG("%c", c);
+			DEBUG_GDB_WIRE("%c", c);
 		else
-			DEBUG("\\x%02X", c);
+			DEBUG_GDB_WIRE("\\x%02X", c);
 	}
-	DEBUG("\n");
+	DEBUG_GDB_WIRE("\n");
 #endif
 	return i;
 }
@@ -97,18 +141,16 @@ void gdb_putpacket(const char *packet, int size)
 	int tries = 0;
 
 	do {
-#ifdef DEBUG_GDBPACKET
-		DEBUG("%s : ", __func__);
-#endif
+		DEBUG_GDB_WIRE("%s : ", __func__);
 		csum = 0;
 		gdb_if_putchar('$', 0);
 		for(i = 0; i < size; i++) {
 			c = packet[i];
-#ifdef DEBUG_GDBPACKET
+#if PC_HOSTED == 1
 			if ((c >= 32) && (c < 127))
-				DEBUG("%c", c);
+				DEBUG_GDB_WIRE("%c", c);
 			else
-				DEBUG("\\x%02X", c);
+				DEBUG_GDB_WIRE("\\x%02X", c);
 #endif
 			if((c == '$') || (c == '#') || (c == '}')) {
 				gdb_if_putchar('}', 0);
@@ -120,12 +162,10 @@ void gdb_putpacket(const char *packet, int size)
 			}
 		}
 		gdb_if_putchar('#', 0);
-		sprintf(xmit_csum, "%02X", csum);
+		snprintf(xmit_csum, sizeof(xmit_csum), "%02X", csum);
 		gdb_if_putchar(xmit_csum[0], 0);
 		gdb_if_putchar(xmit_csum[1], 1);
-#ifdef DEBUG_GDBPACKET
-		DEBUG("\n");
-#endif
+		DEBUG_GDB_WIRE("\n");
 	} while((gdb_if_getchar_to(2000) != '+') && (tries++ < 3));
 }
 
