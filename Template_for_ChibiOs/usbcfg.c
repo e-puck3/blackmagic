@@ -614,7 +614,7 @@ const SerialUSBConfig serusbcfg2 = {
 
 void usbSerialStart(void){
 
-  //fills the vcom strings dynamicaly with the strings in usbcfg.h
+  //fills the vcom strings dynamically with the strings in usbcfg.h
   fillVcomString(vcom_string1, USB_VENDOR_NAME,   sizeof(USB_VENDOR_NAME));
   fillVcomString(vcom_string2, USB_DEVICE_NAME,   sizeof(USB_DEVICE_NAME));
   fillVcomString(vcom_string3, USB_SERIAL_NUMBER, sizeof(USB_SERIAL_NUMBER));

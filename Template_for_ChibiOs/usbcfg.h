@@ -29,7 +29,7 @@
 */
 #define USE_TWO_USB_SERIAL
 
-//power asked to the computer in 2mA incerement (min 100mA, max 500mA)
+//power asked to the computer in 2mA increment (min 100mA, max 500mA)
 #define USB_POWER           50          //(100mA)
 
 #define USB_DEVICE_VID      0x1D50
@@ -82,7 +82,7 @@ void usbSerialStart(void);
 uint8_t isUSBConfigured(void);
 
 /**
- * @brief   Returns the state of the selected controle line of the selected interface
+ * @brief   Returns the state of the selected control line of the selected interface
  * 
  * @param interface     See interface_name_t
  * @param rts_dtr       See control_line_object_t

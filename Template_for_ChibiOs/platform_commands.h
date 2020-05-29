@@ -4,13 +4,13 @@
  * 
  * @written by  		Daniel Burnier
  * @creation date		11.08.2017
- * @modified by 		Eliot ferragni
+ * @modified by 		Eliot Ferragni
  * last modification	27.02.2019
  */
 
 #if defined(PLATFORM_COMMANDS_DEFINE)
 /********************************************/
-/* Begining of platform dedicated commands. */
+/* Beginning of platform dedicated commands. */
 /********************************************/
 
 static bool cmd_example(target *t, int argc, const char **argv);
@@ -23,7 +23,7 @@ static bool cmd_example(target *t, int argc, const char **argv);
 
 #if defined(PLATFORM_COMMANDS_LIST)
 /****************************************************/
-/* Begining of List of platform dedicated commands. */
+/* Beginning of List of platform dedicated commands. */
 /* IMPORTANT : Each line MUST finish with "\"       */
 /****************************************************/
 
@@ -37,7 +37,7 @@ static bool cmd_example(target *t, int argc, const char **argv);
 
 #if defined(PLATFORM_COMMANDS_CODE)
 /****************************************************/
-/* Begining of Code of platform dedicated commands. */
+/* Beginning of Code of platform dedicated commands. */
 /****************************************************/
 
 static bool cmd_example(target *t, int argc, const char **argv)

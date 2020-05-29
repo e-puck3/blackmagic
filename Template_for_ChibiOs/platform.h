@@ -26,7 +26,7 @@
 #include "debug.h"
 
 /* Uncomment to use a second interface to communicate with GDB
-the behavior is to try to read or write to the second interfsce provided if the USB
+the behavior is to try to read or write to the second interface provided if the USB
 isn't connected. It means the USB has always the priority*/
 
 //#define USE_SECOND_GDB_INTERFACE
@@ -52,7 +52,7 @@ isn't connected. It means the USB has always the priority*/
  * @brief 	Tell if the second interface usable for GDB is active
  * @details In the current implementation, it is possible to have a second interface such as UART
  * 			for example to communicate with GDB when the USB isn't connected. 
- * 			This function is used to know if we want to use the second intergace or not.
+ * 			This function is used to know if we want to use the second interface or not.
  * @return true if connected, false otherwise
  */		
 bool platform_is_second_gdb_interface_active(void);
