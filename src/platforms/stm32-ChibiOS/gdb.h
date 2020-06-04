@@ -10,8 +10,6 @@
 #ifndef GDB_H
 #define GDB_H
 
-#include "main.h"
-
 //Event source used to send events to other threads
 extern event_source_t gdb_status_event;
 
