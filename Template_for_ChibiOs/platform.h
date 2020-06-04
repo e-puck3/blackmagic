@@ -78,36 +78,13 @@ void platform_turn_on_target_on_swdp_scan(void);
 #endif /* POWER_ON_WHEN_SWDP_SCAN */
 
 
+#define SWDIO_PORT 	TO_BE_FILLED
+#define SWCLK_PORT 	TO_BE_FILLED
+#define SWDIO_PIN	TO_BE_FILLED
+#define SWCLK_PIN	TO_BE_FILLED
 
-#define JTAG_PORT 	GPIOA
-#define TDI_PORT	JTAG_PORT
-#define TMS_PORT	JTAG_PORT
-#define TCK_PORT	JTAG_PORT
-#define TDO_PORT	JTAG_PORT
-#define TDI_PIN		0
-#define TMS_PIN		0
-#define TCK_PIN		0
-#define TDO_PIN		0
-
-#define SWDIO_PORT 	JTAG_PORT
-#define SWCLK_PORT 	JTAG_PORT
-#define SWDIO_PIN	TMS_PIN
-#define SWCLK_PIN	TCK_PIN
-
-#define TRST_PORT	JTAG_PORT
-#define TRST_PIN	0
-#define SRST_PORT	GPIOA
-#define SRST_PIN	0
-
-#define LED_PORT_ERROR		GPIOA //RED_LED
-#define LED_PORT_UART		GPIOA //BLUE_LED
-#define LED_PORT			GPIOA //GREEN_LED
-
-
-#define LED_ERROR		0	
-#define LED_UART		0	
-#define LED_IDLE_RUN	0	
-#define LED_BOOTLOADER	0
+#define SRST_PORT	TO_BE_FILLED
+#define SRST_PIN	TO_BE_FILLED
 
 #define TMS_SET_MODE() {palSetPadMode(TMS_PORT, SWDIO_PIN, PAL_MODE_OUTPUT_PUSHPULL);}
 
