@@ -31,6 +31,10 @@
 #include "target.h"
 #include "hex_utils.h"
 
+#ifdef USE_CHIBIOS
+#include "usbcfg.h"
+#endif /* USE_CHIBIOS */
+
 
 #define NTOH(x) ((x<=9)?x+'0':'a'+x-10)
 #define HTON(x) ((x<='9')?x-'0':((TOUPPER(x))-'A'+10))
@@ -283,7 +287,6 @@ void remotePacketProcessGEN(uint8_t i, char *packet)
 		break;
 
 #ifdef USE_CHIBIOS
-#include "usbcfg.h"
 	case REMOTE_START:
 		_respondS(REMOTE_RESP_OK, USB_DEVICE_NAME USB_VENDOR_NAME);
 		break;
