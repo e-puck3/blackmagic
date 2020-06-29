@@ -52,7 +52,28 @@ static void swdptap_turnaround(int dir)
 		SWDIO_MODE_FLOAT();
 	gpio_set(SWCLK_PORT, SWCLK_PIN);
 	gpio_set(SWCLK_PORT, SWCLK_PIN);
+#ifdef USE_CHIBIOS
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+#endif /* USE_CHIBIOS */
+
 	gpio_clear(SWCLK_PORT, SWCLK_PIN);
+#ifdef USE_CHIBIOS
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+#endif /* USE_CHIBIOS */
 	if(dir == SWDIO_STATUS_DRIVE)
 		SWDIO_MODE_DRIVE();
 }
@@ -68,10 +89,30 @@ static uint32_t swdptap_seq_in(int ticks)
 		int res;
 		res = gpio_get(SWDIO_PORT, SWDIO_PIN);
 		gpio_set(SWCLK_PORT, SWCLK_PIN);
+#ifdef USE_CHIBIOS
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+#endif /* USE_CHIBIOS */
 		if (res)
 			ret |= index;
 		index <<= 1;
 		gpio_clear(SWCLK_PORT, SWCLK_PIN);
+#ifdef USE_CHIBIOS
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+#endif /* USE_CHIBIOS */
 	}
 
 #ifdef DEBUG_SWD_BITS
@@ -91,20 +132,71 @@ static bool swdptap_seq_in_parity(uint32_t *ret, int ticks)
 	swdptap_turnaround(SWDIO_STATUS_FLOAT);
 	while (len--) {
 		gpio_clear(SWCLK_PORT, SWCLK_PIN);
+#ifdef USE_CHIBIOS
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+#endif /* USE_CHIBIOS */
 		bit = gpio_get(SWDIO_PORT, SWDIO_PIN);
 		gpio_set(SWCLK_PORT, SWCLK_PIN);
+#ifdef USE_CHIBIOS
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+#endif /* USE_CHIBIOS */
 		if (bit) {
 			res |= index;
 		}
 		index <<= 1;
 	}
 	gpio_clear(SWCLK_PORT, SWCLK_PIN);
+#ifdef USE_CHIBIOS
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+#endif /* USE_CHIBIOS */
+
 	int parity = __builtin_popcount(res);
 	bit = gpio_get(SWDIO_PORT, SWDIO_PIN);
 	gpio_set(SWCLK_PORT, SWCLK_PIN);
+#ifdef USE_CHIBIOS
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+#endif /* USE_CHIBIOS */
 	if (bit)
 		parity++;
 	gpio_clear(SWCLK_PORT, SWCLK_PIN);
+#ifdef USE_CHIBIOS
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+#endif /* USE_CHIBIOS */
 #ifdef DEBUG_SWD_BITS
 	for (int i = 0; i < len; i++)
 		DEBUG("%d", (res & (1 << i)) ? 1 : 0);
@@ -124,11 +216,41 @@ static void swdptap_seq_out(uint32_t MS, int ticks)
 	while (ticks--) {
 		gpio_set_val(SWDIO_PORT, SWDIO_PIN, data);
 		gpio_clear(SWCLK_PORT, SWCLK_PIN);
+#ifdef USE_CHIBIOS
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+#endif /* USE_CHIBIOS */
 		MS >>= 1;
 		data = MS & 1;
 		gpio_set(SWCLK_PORT, SWCLK_PIN);
+#ifdef USE_CHIBIOS
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+#endif /* USE_CHIBIOS */
 	}
 	gpio_clear(SWCLK_PORT, SWCLK_PIN);
+#ifdef USE_CHIBIOS
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+#endif /* USE_CHIBIOS */
 }
 
 static void swdptap_seq_out_parity(uint32_t MS, int ticks)
@@ -145,15 +267,75 @@ static void swdptap_seq_out_parity(uint32_t MS, int ticks)
 	while (ticks--) {
 		data = MS & 1;
 		gpio_set(SWCLK_PORT, SWCLK_PIN);
+#ifdef USE_CHIBIOS
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+#endif /* USE_CHIBIOS */
 		gpio_set_val(SWDIO_PORT, SWDIO_PIN, data);
 		MS >>= 1;
 		gpio_clear(SWCLK_PORT, SWCLK_PIN);
+#ifdef USE_CHIBIOS
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+		__asm__ volatile ("nop");
+#endif /* USE_CHIBIOS */
 	}
 	gpio_set_val(SWDIO_PORT, SWDIO_PIN, parity & 1);
 	gpio_clear(SWCLK_PORT, SWCLK_PIN);
+#ifdef USE_CHIBIOS
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+#endif /* USE_CHIBIOS */
 	gpio_set(SWCLK_PORT, SWCLK_PIN);
+#ifdef USE_CHIBIOS
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+#endif /* USE_CHIBIOS */
 	gpio_set(SWCLK_PORT, SWCLK_PIN);
+#ifdef USE_CHIBIOS
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+#endif /* USE_CHIBIOS */
 	gpio_clear(SWCLK_PORT, SWCLK_PIN);
+#ifdef USE_CHIBIOS
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+	__asm__ volatile ("nop");
+#endif /* USE_CHIBIOS */
 }
 
 swd_proc_t swd_proc;

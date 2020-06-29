@@ -8,4 +8,4 @@ More info in the dedicated [readme.md](Template_for_ChibiOs/readme.md)
 
 **Note:** Jtag support has been disabled.
 
-**Note 2:** For now, it only works with systems having a MCU frequency around 72MHz-96MHz because the SWD communication implementation is dependant on the MCU frequency.
+**Note 2:** The SWD communication have been tested with MCU frequency from 46MHz to 216MHz (programmer side). It's not guaranteed it will work outside of this range.
