@@ -25,6 +25,12 @@
 #include "timing_stm32.h"
 #include "debug.h"
 
+/* Uncomment to define a custom section area in the ram to place
+   the working area of the GDB thread. For example ".ram0" 
+   replace .to_be_defined by the section you want to use */
+
+//#define BLACKMAGIC_CUSTOM_RAM_SECTION ".to_be_defined"
+
 /* Uncomment to use a second interface to communicate with GDB
 the behavior is to try to read or write to the second interface provided if the USB
 isn't connected. It means the USB has always the priority*/

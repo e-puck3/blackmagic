@@ -23,7 +23,11 @@ event_source_t gdb_status_event;
 
 /////////////////////////////////////////PRIVATE FUNCTIONS/////////////////////////////////////////
 
+#ifdef BLACKMAGIC_CUSTOM_RAM_SECTION
+__attribute__((section(BLACKMAGIC_CUSTOM_RAM_SECTION))) static THD_WORKING_AREA(gdb_thd_wa, 20480);
+#else
 static THD_WORKING_AREA(gdb_thd_wa, 20480);
+#endif
 static THD_FUNCTION(gdb_thd, arg)
 {
 	(void) arg;
