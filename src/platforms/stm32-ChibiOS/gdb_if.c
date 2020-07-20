@@ -86,7 +86,10 @@ unsigned char gdb_if_getchar(void)
 #else
 		if ( !getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR) )
 #endif /* USE_SECOND_GDB_INTERFACE */
+		{
+			chThdSleepMilliseconds(10);
 			return 0x04;
+		}
 
 		gdb_if_update_buf(TIME_MS2I(1));
 	}
