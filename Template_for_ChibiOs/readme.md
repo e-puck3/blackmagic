@@ -28,7 +28,7 @@ In order to use it, you need to :
 	-	``$(ALLINC)`` 	to 	``INCDIR``
 	-	``$(ALLDEFS)`` 	to 	``UDEFS``
 - Copy the **platform.h**, **platform.c** and **platform_commands.h** files from the **Template_for_ChibiOs** folder and place them where you want in your project and modify what you need inside (mainly the pinout to use). Don't forget to include them in your makefile. 
-- Use the **usbcfg.c/.h** files present in the **Template_for_ChibiOs** folder to configure the USB. They initialize one or two serial ports depending on the config you choose in **usbcfg.h**. You can also use your own usbcfg files but then you need to copy some defines and functions from the **usbcfg.c/.h** files in order to compile. GDB will use **USB_GDB**, which is the first USB interface declared.
+- Use the **usbcfg.c/.h** files present in the **Template_for_ChibiOs** folder to configure the USB. They initialize one or two serial ports depending on the config you choose in **usbcfg.h**. You can also use your own usbcfg files but then you need to copy some defines and functions from the **usbcfg.c/.h** files in order to compile. GDB will use **GDB_USB_INTERFACE**, which is the USB interface set in **platform.h**.
 - Finally, include **gdb.h** in your C code to use the blackmagic module.
 
 Note: as written in **gdb.h**, the user needs to call the function ``initGDBEvents()`` before ``gdbStart()`` to initialize the event source. Otherwise a kernel panic is possible.

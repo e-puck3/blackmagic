@@ -42,8 +42,8 @@ void gdb_if_putchar(unsigned char c, int flush)
 	if(flush || (count_in == USB_DATA_SIZE)) {
 		/* Refuse to send if USB isn't configured, and
 		 * don't bother if nobody's listening */
-		if(( isUSBConfigured() && getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR)) ) {
-			chnWrite((BaseChannel *) &USB_GDB, buffer_in, count_in);
+		if(( isUSBConfigured() && getControlLineState(GDB_USB_INTERFACE_NB, CONTROL_LINE_DTR)) ) {
+			chnWrite((BaseChannel *) &GDB_USB_INTERFACE, buffer_in, count_in);
 		}
 #ifdef USE_SECOND_GDB_INTERFACE
 		//send to the second GDB interface if it is active and connected
@@ -66,7 +66,7 @@ static void gdb_if_update_buf(uint32_t timeout)
 		chThdSleepMilliseconds(10);
 	}
 
-	count_out = chnReadTimeout((BaseChannel *) &USB_GDB, buffer_out, USB_DATA_SIZE, timeout);
+	count_out = chnReadTimeout((BaseChannel *) &GDB_USB_INTERFACE, buffer_out, USB_DATA_SIZE, timeout);
 
 #ifdef USE_SECOND_GDB_INTERFACE
 	if(count_out == 0 && platform_is_second_gdb_interface_active() ){
@@ -82,9 +82,9 @@ unsigned char gdb_if_getchar(void)
 	while (!(out_ptr < count_out)) {
 		/* Detach if port closed */
 #ifdef USE_SECOND_GDB_INTERFACE
-		if ( !getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR) && !platform_is_second_gdb_interface_connected() )
+		if ( !getControlLineState(GDB_USB_INTERFACE_NB, CONTROL_LINE_DTR) && !platform_is_second_gdb_interface_connected() )
 #else
-		if ( !getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR) )
+		if ( !getControlLineState(GDB_USB_INTERFACE_NB, CONTROL_LINE_DTR) )
 #endif /* USE_SECOND_GDB_INTERFACE */
 		{
 			chThdSleepMilliseconds(10);
@@ -105,9 +105,9 @@ unsigned char gdb_if_getchar_to(int timeout)
 	if (!(out_ptr < count_out)) do {
 		/* Detach if port closed */
 #ifdef USE_SECOND_GDB_INTERFACE
-		if ( !getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR) && !platform_is_second_gdb_interface_connected() )
+		if ( !getControlLineState(GDB_USB_INTERFACE_NB, CONTROL_LINE_DTR) && !platform_is_second_gdb_interface_connected() )
 #else
-		if ( !getControlLineState(GDB_INTERFACE, CONTROL_LINE_DTR) )
+		if ( !getControlLineState(GDB_USB_INTERFACE_NB, CONTROL_LINE_DTR) )
 #endif /* USE_SECOND_GDB_INTERFACE */
 			return 0x04;
 

@@ -47,6 +47,9 @@ isn't connected. It means the USB has always the priority*/
 
 //#define PLATFORM_HAS_CUSTOM_COMMANDS
 
+/* You must specify which usb serial port to use */
+#define GDB_USB_INTERFACE_NB	TO_BE_FILLED	// USB interface number (interface_name_t)
+#define GDB_USB_INTERFACE		TO_BE_FILLED	// USB interface (SerialUSBDrivers)
 
 #ifdef USE_SECOND_GDB_INTERFACE
 //Replace with the Serial or USB Serial object you want to use (for example SD2 for UART2) 
