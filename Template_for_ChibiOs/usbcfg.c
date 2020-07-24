@@ -46,7 +46,7 @@ SerialUSBDriver SDU2;
 /*
  * Interfaces
  */
-enum{
+typedef enum{
   USB_CDC_CIF_NUM0 = 0,  
   USB_CDC_DIF_NUM0,
 #ifdef USE_TWO_USB_SERIAL
@@ -56,7 +56,7 @@ enum{
   USB_NUM_INTERFACES
 } t_numInterface;
 
-enum{
+typedef enum{
   USB_INDEX_STRING_SERIAL_A = 4,
   USB_INDEX_STRING_SERIAL_B,
   USB_NUM_STRINGS
@@ -583,7 +583,7 @@ static void sof_handler(USBDriver *usbp) {
 /*
  * USB driver configuration.
  */
-const USBConfig usbcfg = {
+static const USBConfig usbcfg = {
   usb_event,
   get_descriptor,
   requests_hook,
@@ -593,7 +593,7 @@ const USBConfig usbcfg = {
 /*
  * Serial over USB driver configuration 1.
  */
-const SerialUSBConfig serusbcfg1 = {
+static const SerialUSBConfig serusbcfg1 = {
   &USBD1,
   USB_DATA_REQUEST_EP_A,
   USB_DATA_AVAILABLE_EP_A,
@@ -604,7 +604,7 @@ const SerialUSBConfig serusbcfg1 = {
 /*
  * Serial over USB driver configuration 2.
  */
-const SerialUSBConfig serusbcfg2 = {
+static const SerialUSBConfig serusbcfg2 = {
   &USBD1,
   USB_DATA_REQUEST_EP_B,
   USB_DATA_AVAILABLE_EP_B,
@@ -649,7 +649,7 @@ uint8_t isUSBConfigured(void){
 }
 
 uint8_t getControlLineState(interface_name_t interface, control_line_t rts_dtr){
-  if(interface == GDB_INTERFACE){
+  if(interface == SERIAL_1_INTERFACE){
     if(rts_dtr == CONTROL_LINE_RTS){
       return control_line_states.cdc_cif_num0_rts;
     }else if(rts_dtr == CONTROL_LINE_DTR){
@@ -657,7 +657,7 @@ uint8_t getControlLineState(interface_name_t interface, control_line_t rts_dtr){
     }
   }
 #ifdef USE_TWO_USB_SERIAL
-  else if(interface == SERIAL_INTERFACE){
+  else if(interface == SERIAL_2_INTERFACE){
     if(rts_dtr == CONTROL_LINE_RTS){
       return control_line_states.cdc_cif_num1_rts;
     }else if(rts_dtr == CONTROL_LINE_DTR){

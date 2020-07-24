@@ -32,7 +32,7 @@
 #include "hex_utils.h"
 
 #ifdef USE_CHIBIOS
-#include "usbcfg.h"
+#include "platform.h"
 #endif /* USE_CHIBIOS */
 
 
@@ -288,7 +288,7 @@ void remotePacketProcessGEN(uint8_t i, char *packet)
 
 #ifdef USE_CHIBIOS
 	case REMOTE_START:
-		_respondS(REMOTE_RESP_OK, USB_DEVICE_NAME USB_VENDOR_NAME);
+		_respondS(REMOTE_RESP_OK, GDB_DEVICE_NAME GDB_VENDOR_NAME);
 		break;
 
     default:

@@ -24,25 +24,25 @@
  */
 #include "general.h"
 #include "gdb_if.h"
-#include "usbcfg.h"
+#include "platform.h"
 
 static uint32_t count_out;
 static uint32_t count_in;
 static uint32_t out_ptr;
-static uint8_t buffer_out[USB_DATA_SIZE];
-static uint8_t buffer_in[USB_DATA_SIZE];
+static uint8_t buffer_out[GDB_USB_DATA_SIZE];
+static uint8_t buffer_in[GDB_USB_DATA_SIZE];
 #ifdef STM32F4
 //static volatile uint32_t count_new;
-//static uint8_t double_buffer_out[USB_DATA_SIZE];
+//static uint8_t double_buffer_out[GDB_USB_DATA_SIZE];
 #endif
 
 void gdb_if_putchar(unsigned char c, int flush)
 {
 	buffer_in[count_in++] = c;
-	if(flush || (count_in == USB_DATA_SIZE)) {
+	if(flush || (count_in == GDB_USB_DATA_SIZE)) {
 		/* Refuse to send if USB isn't configured, and
 		 * don't bother if nobody's listening */
-		if(( isUSBConfigured() && getControlLineState(GDB_USB_INTERFACE_NB, CONTROL_LINE_DTR)) ) {
+		if(( gdbIsUSBConfigured() && gdbGetControlLineState(GDB_USB_INTERFACE_NB, CONTROL_LINE_DTR)) ) {
 			chnWrite((BaseChannel *) &GDB_USB_INTERFACE, buffer_in, count_in);
 		}
 #ifdef USE_SECOND_GDB_INTERFACE
@@ -59,18 +59,18 @@ void gdb_if_putchar(unsigned char c, int flush)
 static void gdb_if_update_buf(uint32_t timeout)
 {
 #ifdef USE_SECOND_GDB_INTERFACE
-	while ( !isUSBConfigured() && !platform_is_second_gdb_interface_connected() ){
+	while ( !gdbIsUSBConfigured() && !platform_is_second_gdb_interface_connected() ){
 #else
-	while ( !isUSBConfigured() ){
+	while ( !gdbIsUSBConfigured() ){
 #endif /* USE_SECOND_GDB_INTERFACE */
 		chThdSleepMilliseconds(10);
 	}
 
-	count_out = chnReadTimeout((BaseChannel *) &GDB_USB_INTERFACE, buffer_out, USB_DATA_SIZE, timeout);
+	count_out = chnReadTimeout((BaseChannel *) &GDB_USB_INTERFACE, buffer_out, GDB_USB_DATA_SIZE, timeout);
 
 #ifdef USE_SECOND_GDB_INTERFACE
 	if(count_out == 0 && platform_is_second_gdb_interface_active() ){
-		count_out = chnReadTimeout((BaseChannel *) &GDB_2ND_INTERFACE, buffer_out, USB_DATA_SIZE, timeout);
+		count_out = chnReadTimeout((BaseChannel *) &GDB_2ND_INTERFACE, buffer_out, GDB_USB_DATA_SIZE, timeout);
 	}
 #endif /* USE_SECOND_GDB_INTERFACE */
 	out_ptr = 0;
@@ -82,9 +82,9 @@ unsigned char gdb_if_getchar(void)
 	while (!(out_ptr < count_out)) {
 		/* Detach if port closed */
 #ifdef USE_SECOND_GDB_INTERFACE
-		if ( !getControlLineState(GDB_USB_INTERFACE_NB, CONTROL_LINE_DTR) && !platform_is_second_gdb_interface_connected() )
+		if ( !gdbGetControlLineState(GDB_USB_INTERFACE_NB, CONTROL_LINE_DTR) && !platform_is_second_gdb_interface_connected() )
 #else
-		if ( !getControlLineState(GDB_USB_INTERFACE_NB, CONTROL_LINE_DTR) )
+		if ( !gdbGetControlLineState(GDB_USB_INTERFACE_NB, CONTROL_LINE_DTR) )
 #endif /* USE_SECOND_GDB_INTERFACE */
 		{
 			chThdSleepMilliseconds(10);
@@ -105,9 +105,9 @@ unsigned char gdb_if_getchar_to(int timeout)
 	if (!(out_ptr < count_out)) do {
 		/* Detach if port closed */
 #ifdef USE_SECOND_GDB_INTERFACE
-		if ( !getControlLineState(GDB_USB_INTERFACE_NB, CONTROL_LINE_DTR) && !platform_is_second_gdb_interface_connected() )
+		if ( !gdbGetControlLineState(GDB_USB_INTERFACE_NB, CONTROL_LINE_DTR) && !platform_is_second_gdb_interface_connected() )
 #else
-		if ( !getControlLineState(GDB_USB_INTERFACE_NB, CONTROL_LINE_DTR) )
+		if ( !gdbGetControlLineState(GDB_USB_INTERFACE_NB, CONTROL_LINE_DTR) )
 #endif /* USE_SECOND_GDB_INTERFACE */
 			return 0x04;
 
