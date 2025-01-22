@@ -28,7 +28,11 @@
 #include "gdb_packet.h"
 #include "target.h"
 #include "morse.h"
+#ifndef USE_EXTERNAL_VERSION_CMD
 #include "version.h"
+#else
+#include <external_version.h>
+#endif
 
 #ifdef PLATFORM_HAS_TRACESWO
 #	include "traceswo.h"
@@ -142,7 +146,8 @@ int command_process(target *t, char *cmd)
 	return target_command(t, argc, argv);
 }
 
-bool cmd_version(target *t, int argc, char **argv)
+#ifndef USE_EXTERNAL_VERSION_CMD
+static bool cmd_version(target *t, int argc, char **argv)
 {
 	(void)t;
 	(void)argc;
@@ -159,8 +164,9 @@ bool cmd_version(target *t, int argc, char **argv)
 
 	return true;
 }
+#endif
 
-bool cmd_help(target *t, int argc, char **argv)
+static bool cmd_help(target *t, int argc, char **argv)
 {
 	(void)argc;
 	(void)argv;
@@ -226,7 +232,7 @@ static bool cmd_jtag_scan(target *t, int argc, char **argv)
 }
 #endif /* PLATFORM_HAS_NO_JTAG */
 
-bool cmd_swdp_scan(target *t, int argc, char **argv)
+static bool cmd_swdp_scan(target *t, int argc, char **argv)
 {
 	(void)t;
 	(void)argc;
@@ -279,7 +285,7 @@ static void display_target(int i, target *t, void *context)
 			 (target_core_name(t)) ? target_core_name(t): "");
 }
 
-bool cmd_targets(target *t, int argc, char **argv)
+static bool cmd_targets(target *t, int argc, char **argv)
 {
 	(void)t;
 	(void)argc;
@@ -294,7 +300,7 @@ bool cmd_targets(target *t, int argc, char **argv)
 	return true;
 }
 
-bool cmd_morse(target *t, int argc, char **argv)
+static bool cmd_morse(target *t, int argc, char **argv)
 {
 	(void)t;
 	(void)argc;
